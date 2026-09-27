@@ -622,6 +622,158 @@ class Database {
         value TEXT NOT NULL,
         description TEXT,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )`,
+
+      // ── Remix Pipeline Tables ──────────────────────────────────────
+
+      `CREATE TABLE IF NOT EXISTS remix_sources (
+        id TEXT PRIMARY KEY,
+        file_path TEXT NOT NULL,
+        original_url TEXT,
+        creator_name TEXT,
+        rights_status TEXT DEFAULT 'pending',
+        duration REAL DEFAULT 0,
+        resolution TEXT,
+        width INTEGER DEFAULT 0,
+        height INTEGER DEFAULT 0,
+        codec TEXT,
+        audio_codec TEXT,
+        sample_rate INTEGER,
+        channels INTEGER,
+        bitrate INTEGER,
+        frame_rate REAL,
+        file_size INTEGER DEFAULT 0,
+        checksum TEXT,
+        media_type TEXT DEFAULT 'video',
+        notes TEXT,
+        provenance_id TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS remix_source_scenes (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        position INTEGER DEFAULT 0,
+        start_time REAL DEFAULT 0,
+        end_time REAL DEFAULT 0,
+        duration REAL DEFAULT 0,
+        scene_type TEXT DEFAULT 'cut',
+        confidence REAL DEFAULT 0,
+        frame_path TEXT,
+        description TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (source_id) REFERENCES remix_sources(id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS remix_transcripts (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL UNIQUE,
+        provider TEXT DEFAULT 'whisper',
+        model TEXT,
+        language TEXT,
+        full_text TEXT DEFAULT '',
+        segments TEXT DEFAULT '[]',
+        status TEXT DEFAULT 'pending',
+        error TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (source_id) REFERENCES remix_sources(id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS remix_highlights (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        transcript_id TEXT,
+        start_time REAL DEFAULT 0,
+        end_time REAL DEFAULT 0,
+        duration REAL DEFAULT 0,
+        reason TEXT,
+        hook_strength REAL DEFAULT 0,
+        context_completeness REAL DEFAULT 0,
+        recommended_duration REAL DEFAULT 0,
+        transcript_excerpt TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (source_id) REFERENCES remix_sources(id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS remix_plans (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        title TEXT,
+        structure TEXT,
+        source_segments TEXT DEFAULT '[]',
+        original_segments TEXT DEFAULT '[]',
+        commentary_style TEXT,
+        target_duration REAL DEFAULT 0,
+        status TEXT DEFAULT 'draft',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (source_id) REFERENCES remix_sources(id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS remix_commentaries (
+        id TEXT PRIMARY KEY,
+        plan_id TEXT NOT NULL,
+        script_text TEXT,
+        style TEXT,
+        tts_provider TEXT,
+        tts_model TEXT,
+        audio_path TEXT,
+        status TEXT DEFAULT 'draft',
+        error TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (plan_id) REFERENCES remix_plans(id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS remix_jobs (
+        id TEXT PRIMARY KEY,
+        source_id TEXT,
+        plan_id TEXT,
+        status TEXT DEFAULT 'pending',
+        stage TEXT,
+        progress REAL DEFAULT 0,
+        output_path TEXT,
+        export_profile TEXT,
+        error TEXT,
+        details TEXT,
+        cancel_requested INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        completed_at TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS remix_checkpoints (
+        job_id TEXT NOT NULL,
+        stage TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        artifact TEXT,
+        attempt_count INTEGER DEFAULT 1,
+        error TEXT,
+        started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        completed_at TEXT,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (job_id, stage)
+      )`,
+      `CREATE TABLE IF NOT EXISTS remix_qa_results (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL,
+        source_overlap REAL DEFAULT 0,
+        audio_overlap REAL DEFAULT 0,
+        transcript_overlap REAL DEFAULT 0,
+        original_ratio REAL DEFAULT 0,
+        duration_ratio REAL DEFAULT 0,
+        phash_score REAL DEFAULT 0,
+        chromaprint_score REAL DEFAULT 0,
+        structural_score REAL DEFAULT 0,
+        summary TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS remix_revisions (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL,
+        action TEXT,
+        before_state TEXT,
+        after_state TEXT,
+        cost_evidence TEXT,
+        error TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        completed_at TEXT
       )`
     ];
 
@@ -2813,6 +2965,360 @@ class Database {
     };
   }
 
+  // ── Remix Source CRUD ─────────────────────────────────────────
+
+  async createRemixSource(input = {}) {
+    const id = this.generateId('rsrc');
+    await this.executeQuery(
+      `INSERT INTO remix_sources (
+        id, file_path, original_url, creator_name, rights_status,
+        duration, resolution, width, height, codec, audio_codec,
+        sample_rate, channels, bitrate, frame_rate, file_size,
+        checksum, media_type, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        input.filePath,
+        input.originalUrl || null,
+        input.creatorName || null,
+        input.rightsStatus || 'pending',
+        input.duration || 0,
+        input.resolution || null,
+        input.width || 0,
+        input.height || 0,
+        input.codec || null,
+        input.audioCodec || null,
+        input.sampleRate || null,
+        input.channels || null,
+        input.bitrate || null,
+        input.frameRate || null,
+        input.fileSize || 0,
+        input.checksum || null,
+        input.mediaType || 'video',
+        input.notes || null
+      ]
+    );
+    return this.getRemixSource(id);
+  }
+
+  async getRemixSource(id) {
+    return this.getRow('SELECT * FROM remix_sources WHERE id = ?', [id]);
+  }
+
+  async getRemixSourceByChecksum(checksum) {
+    if (!checksum) return null;
+    return this.getRow('SELECT * FROM remix_sources WHERE checksum = ?', [checksum]);
+  }
+
+  async listRemixSources(limit = 50) {
+    return this.getAllRows('SELECT * FROM remix_sources ORDER BY created_at DESC LIMIT ?', [limit]);
+  }
+
+  async updateRemixSource(id, changes = {}) {
+    const current = await this.getRemixSource(id);
+    if (!current) return null;
+    await this.executeQuery(
+      `UPDATE remix_sources SET
+        original_url = ?, creator_name = ?, rights_status = ?,
+        notes = ?, provenance_id = ?, updated_at = datetime('now')
+      WHERE id = ?`,
+      [
+        changes.originalUrl ?? current.original_url,
+        changes.creatorName ?? current.creator_name,
+        changes.rightsStatus ?? current.rights_status,
+        changes.notes ?? current.notes,
+        changes.provenanceId ?? current.provenance_id,
+        id
+      ]
+    );
+    return this.getRemixSource(id);
+  }
+
+  async deleteRemixSource(id) {
+    await this.executeQuery('DELETE FROM remix_transcripts WHERE source_id = ?', [id]);
+    await this.executeQuery('DELETE FROM remix_source_scenes WHERE source_id = ?', [id]);
+    await this.executeQuery('DELETE FROM remix_sources WHERE id = ?', [id]);
+  }
+
+  // ── Remix Source Scene CRUD ──────────────────────────────────
+
+  async createRemixSourceScene(input = {}) {
+    const id = input.id || this.generateId('rscene');
+    await this.executeQuery(
+      `INSERT INTO remix_source_scenes (
+        id, source_id, position, start_time, end_time, duration,
+        scene_type, confidence, frame_path, description
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        input.sourceId,
+        input.position ?? 0,
+        input.startTime ?? 0,
+        input.endTime ?? 0,
+        input.duration ?? 0,
+        input.sceneType || 'cut',
+        input.confidence ?? 0,
+        input.framePath || null,
+        input.description || null
+      ]
+    );
+    return this.getRow('SELECT * FROM remix_source_scenes WHERE id = ?', [id]);
+  }
+
+  async listRemixSourceScenes(sourceId) {
+    return this.getAllRows(
+      'SELECT * FROM remix_source_scenes WHERE source_id = ? ORDER BY position ASC',
+      [sourceId]
+    );
+  }
+
+  async deleteRemixSourceScenes(sourceId) {
+    await this.executeQuery('DELETE FROM remix_source_scenes WHERE source_id = ?', [sourceId]);
+  }
+
+  // ── Remix Transcript CRUD ───────────────────────────────────
+
+  async saveRemixTranscript(input = {}) {
+    const existing = await this.getRemixTranscript(input.sourceId);
+    const id = existing?.id || this.generateId('rtrans');
+    await this.executeQuery(
+      `INSERT INTO remix_transcripts (
+        id, source_id, provider, model, language, full_text,
+        segments, status, error, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(source_id) DO UPDATE SET
+        provider = excluded.provider, model = excluded.model,
+        language = excluded.language, full_text = excluded.full_text,
+        segments = excluded.segments, status = excluded.status,
+        error = excluded.error, updated_at = datetime('now')`,
+      [
+        id,
+        input.sourceId,
+        input.provider || 'whisper',
+        input.model || null,
+        input.language || null,
+        input.fullText || '',
+        JSON.stringify(input.segments || []),
+        input.status || 'pending',
+        input.error || null
+      ]
+    );
+    return this.getRemixTranscript(input.sourceId);
+  }
+
+  async getRemixTranscript(sourceId) {
+    const row = await this.getRow(
+      'SELECT * FROM remix_transcripts WHERE source_id = ?',
+      [sourceId]
+    );
+    if (!row) return null;
+    return {
+      ...row,
+      segments: JSON.parse(row.segments || '[]')
+    };
+  }
+
+  async deleteRemixTranscript(sourceId) {
+    await this.executeQuery('DELETE FROM remix_transcripts WHERE source_id = ?', [sourceId]);
+  }
+
+  // ── Remix Highlights CRUD ───────────────────────────────────
+
+  async createRemixHighlight(input = {}) {
+    const id = this.generateId('rhl');
+    await this.executeQuery(
+      `INSERT INTO remix_highlights (
+        id, source_id, transcript_id, start_time, end_time, duration,
+        reason, hook_strength, context_completeness, recommended_duration,
+        transcript_excerpt, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        input.sourceId,
+        input.transcriptId || null,
+        input.startTime ?? 0,
+        input.endTime ?? 0,
+        input.duration ?? 0,
+        input.reason || null,
+        input.hookStrength ?? 0,
+        input.contextCompleteness ?? 0,
+        input.recommendedDuration ?? 0,
+        input.transcriptExcerpt || null,
+        input.status || 'pending'
+      ]
+    );
+    return this.getRow('SELECT * FROM remix_highlights WHERE id = ?', [id]);
+  }
+
+  async listRemixHighlights(sourceId) {
+    return this.getAllRows('SELECT * FROM remix_highlights WHERE source_id = ? ORDER BY start_time ASC', [sourceId]);
+  }
+
+  async updateRemixHighlight(id, changes = {}) {
+    const current = await this.getRow('SELECT * FROM remix_highlights WHERE id = ?', [id]);
+    if (!current) return null;
+    await this.executeQuery(
+      `UPDATE remix_highlights SET status = ? WHERE id = ?`,
+      [changes.status ?? current.status, id]
+    );
+    return this.getRow('SELECT * FROM remix_highlights WHERE id = ?', [id]);
+  }
+
+  async deleteRemixHighlights(sourceId) {
+    await this.executeQuery('DELETE FROM remix_highlights WHERE source_id = ?', [sourceId]);
+  }
+
+  // ── Remix Plans CRUD ────────────────────────────────────────
+
+  async createRemixPlan(input = {}) {
+    const id = this.generateId('rplan');
+    await this.executeQuery(
+      `INSERT INTO remix_plans (
+        id, source_id, title, structure, source_segments, original_segments,
+        commentary_style, target_duration, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        input.sourceId,
+        input.title || null,
+        JSON.stringify(input.structure || {}),
+        JSON.stringify(input.sourceSegments || []),
+        JSON.stringify(input.originalSegments || []),
+        input.commentaryStyle || null,
+        input.targetDuration ?? 0,
+        input.status || 'draft'
+      ]
+    );
+    return this.getRemixPlan(id);
+  }
+
+  async getRemixPlan(id) {
+    const row = await this.getRow('SELECT * FROM remix_plans WHERE id = ?', [id]);
+    if (!row) return null;
+    return {
+      ...row,
+      structure: JSON.parse(row.structure || '{}'),
+      sourceSegments: JSON.parse(row.source_segments || '[]'),
+      originalSegments: JSON.parse(row.original_segments || '[]')
+    };
+  }
+
+  async updateRemixPlan(id, changes = {}) {
+    const current = await this.getRemixPlan(id);
+    if (!current) return null;
+    await this.executeQuery(
+      `UPDATE remix_plans SET
+        title = ?, structure = ?, source_segments = ?, original_segments = ?,
+        commentary_style = ?, target_duration = ?, status = ?, updated_at = datetime('now')
+      WHERE id = ?`,
+      [
+        changes.title ?? current.title,
+        changes.structure !== undefined ? JSON.stringify(changes.structure) : JSON.stringify(current.structure),
+        changes.sourceSegments !== undefined ? JSON.stringify(changes.sourceSegments) : JSON.stringify(current.sourceSegments),
+        changes.originalSegments !== undefined ? JSON.stringify(changes.originalSegments) : JSON.stringify(current.originalSegments),
+        changes.commentaryStyle ?? current.commentary_style,
+        changes.targetDuration ?? current.target_duration,
+        changes.status ?? current.status,
+        id
+      ]
+    );
+    return this.getRemixPlan(id);
+  }
+
+  // ── Remix Commentaries CRUD ─────────────────────────────────
+
+  async createRemixCommentary(input = {}) {
+    const id = this.generateId('rcom');
+    await this.executeQuery(
+      `INSERT INTO remix_commentaries (
+        id, plan_id, script_text, style, tts_provider, tts_model, audio_path, status, error
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        input.planId,
+        input.scriptText || null,
+        input.style || null,
+        input.ttsProvider || null,
+        input.ttsModel || null,
+        input.audioPath || null,
+        input.status || 'draft',
+        input.error || null
+      ]
+    );
+    return this.getRow('SELECT * FROM remix_commentaries WHERE id = ?', [id]);
+  }
+
+  async listRemixCommentaries(planId) {
+    return this.getAllRows('SELECT * FROM remix_commentaries WHERE plan_id = ? ORDER BY created_at ASC', [planId]);
+  }
+
+  async updateRemixCommentary(id, changes = {}) {
+    const current = await this.getRow('SELECT * FROM remix_commentaries WHERE id = ?', [id]);
+    if (!current) return null;
+    await this.executeQuery(
+      `UPDATE remix_commentaries SET
+        script_text = ?, style = ?, tts_provider = ?, tts_model = ?,
+        audio_path = ?, status = ?, error = ?, updated_at = datetime('now')
+      WHERE id = ?`,
+      [
+        changes.scriptText ?? current.script_text,
+        changes.style ?? current.style,
+        changes.ttsProvider ?? current.tts_provider,
+        changes.ttsModel ?? current.tts_model,
+        changes.audioPath ?? current.audio_path,
+        changes.status ?? current.status,
+        changes.error === undefined ? current.error : changes.error,
+        id
+      ]
+    );
+    return this.getRow('SELECT * FROM remix_commentaries WHERE id = ?', [id]);
+  }
+
+  // ── Remix Jobs CRUD ─────────────────────────────────────────
+
+  async createRemixJob(input = {}) {
+    const id = this.generateId('rjob');
+    await this.executeQuery(
+      `INSERT INTO remix_jobs (
+        id, source_id, plan_id, status, stage, details
+      ) VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        input.sourceId || null,
+        input.planId || null,
+        input.status || 'pending',
+        input.stage || 'init',
+        input.details ? JSON.stringify(input.details) : null
+      ]
+    );
+    return this.getRow('SELECT * FROM remix_jobs WHERE id = ?', [id]);
+  }
+
+  async updateRemixJob(id, changes = {}) {
+    const current = await this.getRow('SELECT * FROM remix_jobs WHERE id = ?', [id]);
+    if (!current) return null;
+    await this.executeQuery(
+      `UPDATE remix_jobs SET
+        plan_id = ?, status = ?, stage = ?, progress = ?, output_path = ?,
+        error = ?, details = ?, cancel_requested = ?,
+        updated_at = datetime('now'),
+        completed_at = ?
+      WHERE id = ?`,
+      [
+        changes.planId ?? current.plan_id,
+        changes.status ?? current.status,
+        changes.stage ?? current.stage,
+        changes.progress ?? current.progress,
+        changes.outputPath ?? current.output_path,
+        changes.error === undefined ? current.error : changes.error,
+        changes.details ? JSON.stringify(changes.details) : current.details,
+        changes.cancelRequested ?? current.cancel_requested,
+        changes.completedAt ?? current.completed_at,
+        id
+      ]
+    );
+    return this.getRow('SELECT * FROM remix_jobs WHERE id = ?', [id]);
+  }
   // Utility methods
   generateId(prefix) {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}`;

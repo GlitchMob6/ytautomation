@@ -31,6 +31,7 @@
         <button class="nav-item" data-view="engagement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 01-9.1 8.4 9 9 0 01-3.8-.9L3 20l1-4.9A8.4 8.4 0 1121 11.5z"/><path d="M8 10h8M8 13.5h5"/></svg> Engagement</button>
         <button class="nav-item" data-view="readiness"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.8l7.5 3v6c0 4.8-3.2 8.2-7.5 9.4-4.3-1.2-7.5-4.6-7.5-9.4v-6z"/><path d="M8.8 12.2l2.3 2.3 4.4-4.6"/></svg> Production readiness</button>
         <button class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.87.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.33-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.51 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.28.66.9 1.05 1.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.51 1z"/></svg> Channel setup</button>
+        <button class="nav-item" data-view="remix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 6.5 7 1-5 4.9 1.2 7-6.2-3.3-6.2 3.3L7 14.4 2 9.5l7-1L12 2z"/></svg> Remix Studio</button>
       </nav>
       <div class="sidebar-footer">
         <div class="system-pill"><i id="system-dot"></i><span id="system-label">Connecting…</span></div>
@@ -282,6 +283,26 @@
           </div>
           <div class="form-actions"><button type="submit" class="button primary">Save channel setup</button><button id="api-key-button" type="button" class="button secondary">Set dashboard API key</button></div>
         </form>
+      </section>
+
+      <!-- REMIX STUDIO -->
+      <section id="remix-view" class="view">
+        <header class="section-header">
+          <div>
+            <h2>Remix Studio</h2>
+            <p>Transform long-form videos into viral Shorts and TikToks</p>
+          </div>
+          <button class="btn primary" onclick="app.showRemixModal()">New Remix</button>
+        </header>
+        
+        <div class="card">
+          <div class="card-header">
+            <h3>Recent Remix Jobs</h3>
+          </div>
+          <div class="list" id="remix-jobs-list">
+            <div class="empty-state">Loading remix jobs...</div>
+          </div>
+        </div>
       </section>
     </main>
   </div>

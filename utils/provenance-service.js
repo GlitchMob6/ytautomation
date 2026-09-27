@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const SOURCE_TYPES = new Set(['article', 'video', 'dataset', 'official', 'asset', 'other']);
+const SOURCE_TYPES = new Set(['article', 'video', 'dataset', 'official', 'asset', 'other', 'source_media']);
 const SOURCE_STATUSES = new Set(['pending', 'verified', 'rejected']);
 const CLAIM_RISKS = new Set(['standard', 'high']);
 const CLAIM_STATUSES = new Set(['pending', 'supported', 'unsupported', 'waived']);
@@ -126,8 +126,10 @@ class ProvenanceService {
   }
 
   validUrl(value) {
+    const val = String(value || '').trim();
+    if (val.startsWith('/') || val.startsWith('./') || /^[a-zA-Z]:\\/.test(val)) return val;
     try {
-      const url = new URL(String(value || '').trim());
+      const url = new URL(val);
       return ['http:', 'https:'].includes(url.protocol) ? url.toString() : '';
     } catch (_error) {
       return '';

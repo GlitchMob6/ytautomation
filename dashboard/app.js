@@ -145,6 +145,10 @@ function renderDashboard() {
   renderReadiness(state.readiness);
   renderOperator(state.channelStrategy, state.operatorRuns || [], { ...state.system, readiness: state.readiness });
   populateSettings(state.profile, state.settings, state.system.videoProviders || []);
+
+  if ($('.nav-item.active')?.dataset.view === 'remix') {
+    fetchRemixJobs();
+  }
 }
 
 function renderReadiness(readiness = {}) {
@@ -1746,6 +1750,68 @@ $('#api-key-button').addEventListener('click', () => {
 });
 
 const initialView = location.hash.slice(1);
-if (['overview', 'operator', 'pipeline', 'calendar', 'analytics', 'engagement', 'readiness', 'settings'].includes(initialView)) switchView(initialView);
+if (['overview', 'operator', 'pipeline', 'calendar', 'analytics', 'engagement', 'readiness', 'settings', 'remix'].includes(initialView)) switchView(initialView);
 refreshDashboard();
 setInterval(() => refreshDashboard(true), 8000);
+
+window.app = {
+  async showRemixModal() {
+    const url = prompt('Enter a video URL or file path for the remix:');
+    if (!url) return;
+    try {
+      const srcRes = await fetch('/api/remix/sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, type: url.startsWith('/') || url.match(/^[a-zA-Z]:\\/) ? 'local' : 'remote' })
+      });
+      const source = await srcRes.json();
+      if (source.error) throw new Error(source.error);
+      
+      const jobRes = await fetch('/api/remix/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceId: source.id })
+      });
+      const job = await jobRes.json();
+      if (job.error) throw new Error(job.error);
+      
+      fetchRemixJobs();
+    } catch (e) {
+      alert(`Error starting remix: ${e.message}`);
+    }
+  }
+};
+
+async function fetchRemixJobs() {
+  try {
+    const res = await fetch('/api/remix/jobs');
+    const jobs = await res.json();
+    renderRemixJobs(jobs);
+  } catch (e) {
+    console.error('Failed to load remix jobs:', e);
+  }
+}
+
+function renderRemixJobs(jobs = []) {
+  const container = $('#remix-jobs-list');
+  if (!container) return;
+  if (!jobs.length) {
+    container.innerHTML = `<div class="empty-state">No remix jobs yet</div>`;
+    return;
+  }
+  
+  container.innerHTML = jobs.map(job => `
+    <div class="job-item">
+      <div>
+        <div class="job-title">Job: ${job.id}</div>
+        <div class="job-meta">Source: ${job.source_id} | Plan: ${job.plan_id || 'N/A'}</div>
+        <div class="job-meta">Progress: ${job.progress || 0}% | Stage: ${job.stage || 'init'}</div>
+        ${job.output_path ? `<div class="job-meta">Output: <a href="file://${job.output_path}" target="_blank">View Render</a></div>` : ''}
+        ${job.error ? `<div class="job-meta" style="color:var(--danger)">Error: ${job.error}</div>` : ''}
+      </div>
+      <div>
+        <span class="badge ${job.status === 'completed' ? 'success' : job.status === 'failed' ? 'danger' : 'accent'}">${job.status}</span>
+      </div>
+    </div>
+  `).join('');
+}

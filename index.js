@@ -27,6 +27,7 @@ const { AudienceEngagementService } = require('./utils/audience-engagement-servi
 const { GrowthExperimentService } = require('./utils/growth-experiment-service');
 const { AITextService } = require('./utils/ai-text-service');
 const { DiscoverabilityService } = require('./utils/discoverability-service');
+const { RemixPromotionAgent } = require('./agents/remix-promotion-agent');
 const { version } = require('./package.json');
 const chalk = require('chalk');
 
@@ -109,10 +110,14 @@ class YouTubeAutomationAgent {
         { logger: this.logger }
       );
       this.shorts = new ShortsRepurposingService(this.db, this.agents.publishing, { logger: this.logger });
+      
+      this.aiTextService = new AITextService(this.credentials?.credentials || {});
+      this.remixAgent = new RemixPromotionAgent(this.db, this.aiTextService, { logger: this.logger });
+
       this.engagement = new AudienceEngagementService(
         this.db,
         this.credentials,
-        new AITextService(this.credentials?.credentials || {}),
+        this.aiTextService,
         { logger: this.logger }
       );
       this.experiments = new GrowthExperimentService(
@@ -130,6 +135,7 @@ class YouTubeAutomationAgent {
       
       // Setup API endpoints
       this.setupAPI();
+      this.setupRemixAPI();
       
       // Initialize scheduler
       this.logger.info('Setting up automation scheduler...');
@@ -467,6 +473,78 @@ class YouTubeAutomationAgent {
     });
 
     this.setupOperatorAPI();
+  }
+
+  setupRemixAPI() {
+    // Ingest a new source video for remixing
+    this.app.post('/api/remix/sources', async (req, res) => {
+      try {
+        const { url, type, creatorName } = req.body;
+        if (!url) return res.status(400).json({ error: 'URL or filepath required' });
+        
+        let originalUrl = url;
+        let filePath = null;
+        if (type === 'local') {
+          filePath = url;
+        } else {
+          // Downloader logic placeholder
+        }
+
+        const source = await this.db.createRemixSource({
+          originalUrl,
+          filePath,
+          creatorName: creatorName || 'Unknown'
+        });
+        
+        res.status(201).json(source);
+      } catch (error) {
+        this.logger.error('API Error:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Start a new remix job
+    this.app.post('/api/remix/jobs', async (req, res) => {
+      try {
+        const { sourceId } = req.body;
+        if (!sourceId) return res.status(400).json({ error: 'sourceId required' });
+        
+        const job = await this.db.createRemixJob({
+          sourceId,
+          status: 'pending'
+        });
+        
+        // Fire and forget execution
+        this.remixAgent.runJob(job.id).catch(e => this.logger.error(`Job ${job.id} failed:`, e));
+        
+        res.status(201).json(job);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Get list of remix jobs
+    this.app.get('/api/remix/jobs', async (req, res) => {
+      try {
+        const jobs = await this.db.getAllRows('SELECT * FROM remix_jobs ORDER BY created_at DESC LIMIT 50');
+        res.json(jobs || []);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Get specific job status
+    this.app.get('/api/remix/jobs/:id', async (req, res) => {
+      try {
+        const job = await this.db.getRow('SELECT * FROM remix_jobs WHERE id = ?', [req.params.id]);
+        if (!job) return res.status(404).json({ error: 'Job not found' });
+        
+        const checkpoints = await this.db.getAllRows('SELECT * FROM remix_checkpoints WHERE job_id = ? ORDER BY started_at ASC', [job.id]);
+        res.json({ ...job, checkpoints });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
   }
 
   setupOperatorAPI() {

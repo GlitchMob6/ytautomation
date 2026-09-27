@@ -5,8 +5,25 @@ const { AudienceEngagementService } = require('./utils/audience-engagement-servi
 const { DailyAutomation } = require('./schedules/daily-automation');
 const chalk = require('chalk');
 const path = require('path');
+const fs = require('fs').promises;
 const { ProductionReadinessService } = require('./utils/production-readiness-service');
 const { normalizeTags, validateYouTubeMetadata } = require('./utils/youtube-metadata-validator');
+const { SourceIngestionService, SUPPORTED_VIDEO, RIGHTS_STATUSES } = require('./utils/source-ingestion-service');
+const { MediaAnalysisService } = require('./utils/media-analysis-service');
+const { TranscriptService, WHISPER_MODELS } = require('./utils/transcript-service');
+const { getMediaInfo, extractAudioStream, sampleFramesFromVideo } = require('./utils/ffmpeg');
+const { HighlightSelectionService } = require('./utils/highlight-selection-service');
+const { RemixPlannerService } = require('./utils/remix-planner-service');
+const { CommentaryService } = require('./utils/commentary-service');
+const { LocalTTSService, PIPER_MODELS } = require('./utils/local-tts-service');
+const { RemixRendererService } = require('./utils/remix-renderer-service');
+const { MediaEnhancementService } = require('./utils/media-enhancement-service');
+const { AudioSyncService } = require('./utils/audio-sync-service');
+const { MetadataService } = require('./utils/metadata-service');
+const { DeepCleanService } = require('./utils/deep-clean-service');
+const { TransformationQAService } = require('./utils/transformation-qa-service');
+const { RemixRecoveryService } = require('./utils/remix-recovery-service');
+const { RemixPromotionAgent } = require('./agents/remix-promotion-agent');
 
 class SystemTest {
   constructor() {
@@ -64,7 +81,24 @@ class SystemTest {
       { name: 'Reply Approval and Posting', test: () => this.testReplyApprovalAndPosting() },
       { name: 'Engagement AI Provider Wiring', test: () => this.testEngagementAIProviderWiring() },
       { name: 'Engagement Sync Schedule', test: () => this.testEngagementSyncSchedule() },
-      { name: 'Growth Experiment Refresh Schedule', test: () => this.testGrowthExperimentRefreshSchedule() }
+      { name: 'Growth Experiment Refresh Schedule', test: () => this.testGrowthExperimentRefreshSchedule() },
+      { name: 'Remix Source Database Tables', test: () => this.testRemixSourceDatabaseTables() },
+      { name: 'Remix Source Ingestion Service', test: () => this.testRemixSourceIngestionService() },
+      { name: 'Remix Media Analysis Service', test: () => this.testRemixMediaAnalysisService() },
+      { name: 'Remix Transcript Service', test: () => this.testRemixTranscriptService() },
+      { name: 'Remix FFmpeg Utility Extensions', test: () => this.testRemixFFmpegUtilityExtensions() },
+      { name: 'Remix Highlight Selection Service', test: () => this.testRemixHighlightSelectionService() },
+      { name: 'Remix Planner Service', test: () => this.testRemixPlannerService() },
+      { name: 'Remix Commentary Service', test: () => this.testRemixCommentaryService() },
+      { name: 'Remix Local TTS Service', test: () => this.testRemixLocalTTSService() },
+      { name: 'Remix Renderer Service', test: () => this.testRemixRendererService() },
+      { name: 'Remix Media Enhancement Service', test: () => this.testRemixMediaEnhancementService() },
+      { name: 'Remix Audio Sync Service', test: () => this.testRemixAudioSyncService() },
+      { name: 'Remix Metadata Service', test: () => this.testRemixMetadataService() },
+      { name: 'Remix Deep Clean Service', test: () => this.testRemixDeepCleanService() },
+      { name: 'Remix Transformation QA Service', test: () => this.testRemixTransformationQAService() },
+      { name: 'Remix Recovery Service', test: () => this.testRemixRecoveryService() },
+      { name: 'Remix Promotion Agent', test: () => this.testRemixPromotionAgent() }
     ];
 
     let passed = 0;
@@ -3463,6 +3497,682 @@ class SystemTest {
     }
     const noService = new DailyAutomation({}, {}, {});
     await noService.refreshGrowthExperiments();
+  }
+  // ── Remix Pipeline Tests ─────────────────────────────────────
+
+  async testRemixSourceDatabaseTables() {
+    const db = new Database();
+    await db.initialize();
+
+    try {
+      // Test remix_sources CRUD
+      const source = await db.createRemixSource({
+        filePath: '/tmp/test_video.mp4',
+        originalUrl: 'https://example.com/video',
+        creatorName: 'Test Creator',
+        rightsStatus: 'fair_use',
+        duration: 120.5,
+        resolution: '1920x1080',
+        width: 1920,
+        height: 1080,
+        codec: 'h264',
+        audioCodec: 'aac',
+        sampleRate: 44100,
+        channels: 2,
+        bitrate: 5000000,
+        frameRate: 30,
+        fileSize: 50000000,
+        checksum: 'abc123def456',
+        mediaType: 'video',
+        notes: 'Test source'
+      });
+      if (!source || !source.id.startsWith('rsrc_')) throw new Error('Source creation failed');
+      if (source.duration !== 120.5) throw new Error('Source duration mismatch');
+      if (source.rights_status !== 'fair_use') throw new Error('Source rights_status mismatch');
+
+      // Test getByChecksum
+      const byChecksum = await db.getRemixSourceByChecksum('abc123def456');
+      if (!byChecksum || byChecksum.id !== source.id) throw new Error('Checksum lookup failed');
+      const noChecksum = await db.getRemixSourceByChecksum('nonexistent');
+      if (noChecksum) throw new Error('Nonexistent checksum should return null');
+
+      // Test update
+      const updated = await db.updateRemixSource(source.id, { rightsStatus: 'licensed', creatorName: 'Updated Creator' });
+      if (updated.rights_status !== 'licensed') throw new Error('Source update failed');
+
+      // Test list
+      const sources = await db.listRemixSources(10);
+      if (!sources.some(s => s.id === source.id)) throw new Error('Source listing failed');
+
+      // Test remix_source_scenes CRUD
+      const scene = await db.createRemixSourceScene({
+        sourceId: source.id,
+        position: 0,
+        startTime: 0,
+        endTime: 30.5,
+        duration: 30.5,
+        sceneType: 'cut',
+        confidence: 0.85,
+        description: 'First scene'
+      });
+      if (!scene || !scene.id.startsWith('rscene_')) throw new Error('Scene creation failed');
+      if (scene.start_time !== 0 || scene.end_time !== 30.5) throw new Error('Scene timestamps mismatch');
+
+      const scenes = await db.listRemixSourceScenes(source.id);
+      if (scenes.length < 1) throw new Error('Scene listing failed');
+
+      // Test remix_transcripts CRUD
+      const transcript = await db.saveRemixTranscript({
+        sourceId: source.id,
+        provider: 'whisper',
+        model: 'base',
+        language: 'en',
+        fullText: 'Hello world test transcript',
+        segments: [{ index: 0, start: 0, end: 5, text: 'Hello world' }],
+        status: 'completed'
+      });
+      if (!transcript || !transcript.id.startsWith('rtrans_')) throw new Error('Transcript creation failed');
+      if (!Array.isArray(transcript.segments)) throw new Error('Transcript segments not parsed');
+      if (transcript.segments[0].text !== 'Hello world') throw new Error('Transcript segment text mismatch');
+
+      // Test upsert (ON CONFLICT)
+      const updated2 = await db.saveRemixTranscript({
+        sourceId: source.id,
+        provider: 'whisper',
+        model: 'medium',
+        language: 'en',
+        fullText: 'Updated transcript',
+        segments: [{ index: 0, start: 0, end: 10, text: 'Updated text' }],
+        status: 'completed'
+      });
+      if (updated2.model !== 'medium') throw new Error('Transcript upsert failed');
+      if (updated2.full_text !== 'Updated transcript') throw new Error('Transcript upsert text mismatch');
+
+      // Test get
+      const retrieved = await db.getRemixTranscript(source.id);
+      if (!retrieved || retrieved.full_text !== 'Updated transcript') throw new Error('Transcript get failed');
+
+      // Test cascade delete
+      await db.deleteRemixSource(source.id);
+      const deleted = await db.getRemixSource(source.id);
+      if (deleted) throw new Error('Source delete failed');
+      const deletedScenes = await db.listRemixSourceScenes(source.id);
+      if (deletedScenes.length > 0) throw new Error('Cascade scene delete failed');
+      const deletedTranscript = await db.getRemixTranscript(source.id);
+      if (deletedTranscript) throw new Error('Cascade transcript delete failed');
+
+      this.logger.info('Remix source database tables test passed');
+    } finally {
+      await db.close();
+    }
+  }
+
+  async testRemixSourceIngestionService() {
+    const db = new Database();
+    await db.initialize();
+
+    try {
+      const service = new SourceIngestionService(db, { dataRoot: path.join(__dirname, 'data', 'remix') });
+
+      // Test validation: empty file path
+      try {
+        await service.ingest({});
+        throw new Error('Should have thrown for empty path');
+      } catch (error) {
+        if (!error.message.includes('file path')) throw error;
+      }
+
+      // Test validation: unsupported file type
+      try {
+        await service.ingest({ filePath: '/tmp/test.xyz' });
+        throw new Error('Should have thrown for unsupported type');
+      } catch (error) {
+        if (!error.message.includes('Unsupported')) throw error;
+      }
+
+      // Test supported extensions set
+      if (!SUPPORTED_VIDEO.has('.mp4')) throw new Error('MP4 should be supported');
+      if (!SUPPORTED_VIDEO.has('.mkv')) throw new Error('MKV should be supported');
+      if (SUPPORTED_VIDEO.has('.txt')) throw new Error('TXT should not be supported');
+
+      // Test rights statuses
+      if (!RIGHTS_STATUSES.has('fair_use')) throw new Error('fair_use should be valid');
+      if (!RIGHTS_STATUSES.has('licensed')) throw new Error('licensed should be valid');
+      if (RIGHTS_STATUSES.has('invalid_status')) throw new Error('invalid_status should not be valid');
+
+      // Test probe method exists and has correct return structure
+      if (typeof service.probeMedia !== 'function') throw new Error('probeMedia method missing');
+      if (typeof service.computeChecksum !== 'function') throw new Error('computeChecksum method missing');
+
+      // Test text helper
+      if (service.text('  hello  ', 10) !== 'hello') throw new Error('Text trim failed');
+      if (service.text('a'.repeat(200), 10).length !== 10) throw new Error('Text truncation failed');
+
+      // Test formatDuration
+      if (service.formatDuration(0) !== '0s') throw new Error('Duration 0 failed');
+      if (service.formatDuration(65) !== '1m5s') throw new Error('Duration 65 failed');
+      if (service.formatDuration(3661) !== '1h1m1s') throw new Error('Duration 3661 failed');
+
+      this.logger.info('Remix source ingestion service test passed');
+    } finally {
+      await db.close();
+    }
+  }
+
+  async testRemixMediaAnalysisService() {
+    const db = new Database();
+    await db.initialize();
+
+    try {
+      const service = new MediaAnalysisService(db, { dataRoot: path.join(__dirname, 'data', 'remix') });
+
+      // Test aspect ratio computation
+      if (service.computeAspectRatio(1920, 1080) !== '16:9') throw new Error('16:9 aspect ratio failed');
+      if (service.computeAspectRatio(1080, 1920) !== '9:16') throw new Error('9:16 aspect ratio failed');
+      if (service.computeAspectRatio(1080, 1080) !== '1:1') throw new Error('1:1 aspect ratio failed');
+      if (service.computeAspectRatio(0, 0) !== null) throw new Error('null aspect ratio for 0x0 failed');
+
+      // Test GCD
+      if (service.gcd(1920, 1080) !== 120) throw new Error('GCD(1920,1080) should be 120');
+      if (service.gcd(12, 8) !== 4) throw new Error('GCD(12,8) should be 4');
+
+      // Test formatTime
+      if (service.formatTime(0) !== '0:00.0') throw new Error('formatTime(0) failed');
+      if (!service.formatTime(3661).includes('1:01')) throw new Error('formatTime(3661) failed');
+
+      // Test scene detection parser
+      const fakeStderr = 'pts_time:5.5\npts_time:12.3\npts_time:25.0\n';
+      const scenes = service.parseSceneDetection(fakeStderr, 60);
+      if (scenes.length < 3) throw new Error(`Expected >= 3 scenes, got ${scenes.length}`);
+      if (scenes[0].startTime !== 0) throw new Error('First scene should start at 0');
+
+      // Test deduplication in parser
+      const dupStderr = 'pts_time:5.0\npts_time:5.1\npts_time:5.2\npts_time:10.0\n';
+      const dedupScenes = service.parseSceneDetection(dupStderr, 60);
+      // Should deduplicate scenes < 0.5s apart
+      const times = dedupScenes.map(s => s.startTime);
+      for (let i = 1; i < times.length; i++) {
+        if (times[i] - times[i - 1] < 0.5) throw new Error('Scene deduplication failed');
+      }
+
+      // Test not found error
+      try {
+        await service.analyze('nonexistent_source');
+        throw new Error('Should have thrown for nonexistent source');
+      } catch (error) {
+        if (error.status !== 404) throw error;
+      }
+
+      this.logger.info('Remix media analysis service test passed');
+    } finally {
+      await db.close();
+    }
+  }
+
+  async testRemixTranscriptService() {
+    const db = new Database();
+    await db.initialize();
+
+    try {
+      const service = new TranscriptService(db, { dataRoot: path.join(__dirname, 'data', 'remix') });
+
+      // Test Whisper model constants
+      if (!WHISPER_MODELS.includes('base')) throw new Error('base should be a valid model');
+      if (!WHISPER_MODELS.includes('large-v3')) throw new Error('large-v3 should be a valid model');
+
+      // Test placeholder transcript generation
+      const placeholder = service.generatePlaceholderTranscript({ duration: 90, id: 'test' });
+      if (!placeholder.text.includes('Whisper')) throw new Error('Placeholder text should mention Whisper');
+      if (placeholder.segments.length < 3) throw new Error('90s video should have >= 3 placeholder segments');
+      if (placeholder.segments[0].start !== 0) throw new Error('First segment should start at 0');
+
+      // Test Whisper output parser
+      const fakeWhisperOutput = {
+        language: 'en',
+        segments: [
+          { start: 0, end: 5.5, text: ' Hello world ', words: [{ word: 'Hello', start: 0, end: 0.5, probability: 0.95 }] },
+          { start: 5.5, end: 10, text: ' Second segment ', words: [] }
+        ]
+      };
+      const parsed = service.parseWhisperOutput(fakeWhisperOutput);
+      if (parsed.language !== 'en') throw new Error('Language should be en');
+      if (parsed.segments.length !== 2) throw new Error('Should have 2 segments');
+      if (parsed.segments[0].text !== 'Hello world') throw new Error('Segment text should be trimmed');
+      if (!parsed.text.includes('Hello world')) throw new Error('Full text should contain segment text');
+
+      // Test formatTime
+      if (service.formatTime(0) !== '0:00') throw new Error('formatTime(0) failed');
+      if (service.formatTime(65) !== '1:05') throw new Error('formatTime(65) failed');
+      if (service.formatTime(3661) !== '1:01:01') throw new Error('formatTime(3661) failed');
+
+      // Test not found
+      try {
+        await service.transcribe('nonexistent');
+        throw new Error('Should have thrown for nonexistent source');
+      } catch (error) {
+        if (error.status !== 404) throw error;
+      }
+
+      // Test scene alignment requires transcript
+      try {
+        await service.alignToScenes('nonexistent');
+        throw new Error('Should have thrown for missing transcript');
+      } catch (error) {
+        if (error.status !== 400) throw error;
+      }
+
+      this.logger.info('Remix transcript service test passed');
+    } finally {
+      await db.close();
+    }
+  }
+
+  async testRemixFFmpegUtilityExtensions() {
+    // Test that the new exports exist
+    if (typeof getMediaInfo !== 'function') throw new Error('getMediaInfo not exported');
+    if (typeof extractAudioStream !== 'function') throw new Error('extractAudioStream not exported');
+    if (typeof sampleFramesFromVideo !== 'function') throw new Error('sampleFramesFromVideo not exported');
+
+    // Test getMediaInfo throws on nonexistent file
+    try {
+      await getMediaInfo('/nonexistent/file.mp4');
+      throw new Error('Should have thrown for nonexistent file');
+    } catch (error) {
+      if (error.message === 'Should have thrown for nonexistent file') throw error;
+      // Expected: ffprobe error
+    }
+
+    // Test extractAudioStream throws on nonexistent file
+    try {
+      await extractAudioStream('/nonexistent/file.mp4', '/tmp/out.wav');
+      throw new Error('Should have thrown for nonexistent file');
+    } catch (error) {
+      if (error.message === 'Should have thrown for nonexistent file') throw error;
+      // Expected: ffmpeg error
+    }
+
+    this.logger.info('Remix FFmpeg utility extensions test passed');
+  }
+
+  async testRemixHighlightSelectionService() {
+    const db = new Database();
+    await db.initialize();
+
+    try {
+      const source = await db.createRemixSource({ filePath: '/test.mp4', duration: 120 });
+      const transcript = await db.saveRemixTranscript({
+        sourceId: source.id,
+        status: 'completed',
+        fullText: 'Hello world. This is a test. Wow this is amazing.',
+        segments: [
+          { start: 0, end: 5, text: 'Hello world, this is a test of the video.' },
+          { start: 5, end: 25, text: 'This is a test of the highlight selection service. It should be able to pick up this sentence and understand that this is a great highlight because it is very informative and has enough words.' },
+          { start: 25, end: 40, text: 'Wow this is amazing, and I cannot wait to see what happens next in this incredible video.' }
+        ]
+      });
+
+      // Mock AITextService
+      const mockAITextService = {
+        isAvailable: () => true,
+        generateText: async (prompt) => {
+          return JSON.stringify([
+            { id: 1, reason: "Good test", hookStrength: 0.9, contextCompleteness: 0.8 }
+          ]);
+        }
+      };
+
+      const service = new HighlightSelectionService(db, { aiTextService: mockAITextService });
+      
+      const highlights = await service.selectHighlights(source.id, { minDuration: 10, maxDuration: 30 });
+      
+      if (!highlights || highlights.length !== 1) throw new Error(`Expected 1 highlight, got ${highlights ? highlights.length : 0}`);
+      if (highlights[0].hook_strength !== 0.9) throw new Error('Hook strength mismatch');
+      
+      this.logger.info('Remix highlight selection service test passed');
+    } finally {
+      await db.close();
+    }
+  }
+
+  async testRemixPlannerService() {
+    const db = new Database();
+    await db.initialize();
+
+    try {
+      const source = await db.createRemixSource({ filePath: '/test.mp4', duration: 120 });
+      const h1 = await db.createRemixHighlight({ sourceId: source.id, duration: 15 });
+      const h2 = await db.createRemixHighlight({ sourceId: source.id, duration: 20 });
+
+      const service = new RemixPlannerService(db);
+      
+      const plan = await service.createPlan(source.id, [h1.id, h2.id], { commentaryStyle: 'reaction' });
+      
+      if (!plan || plan.id === undefined) throw new Error('Plan creation failed');
+      if (plan.source_id !== source.id) throw new Error('Plan source ID mismatch');
+      if (plan.commentary_style !== 'reaction') throw new Error('Plan style mismatch');
+      if (plan.sourceSegments.length !== 2) throw new Error('Plan should have 2 source segments');
+      // reaction style adds hook, 2 reactions, outro = 4 original segments
+      if (plan.originalSegments.length !== 4) throw new Error(`Expected 4 original segments, got ${plan.originalSegments.length}`);
+      
+      this.logger.info('Remix planner service test passed');
+    } finally {
+      await db.close();
+    }
+  }
+
+  async testRemixCommentaryService() {
+    const db = new Database();
+    await db.initialize();
+
+    try {
+      const source = await db.createRemixSource({ filePath: '/test.mp4', duration: 120 });
+      const plan = await db.createRemixPlan({
+        sourceId: source.id,
+        commentaryStyle: 'reaction',
+        originalSegments: [
+          { id: 'orig_hook', type: 'hook' },
+          { id: 'orig_outro', type: 'outro' }
+        ]
+      });
+
+      // Mock AITextService
+      const mockAITextService = {
+        isAvailable: () => true,
+        generateText: async (prompt) => {
+          return JSON.stringify({
+            "orig_hook": "Welcome!",
+            "orig_outro": "Goodbye!"
+          });
+        }
+      };
+
+      const service = new CommentaryService(db, { aiTextService: mockAITextService });
+      
+      const commentary = await service.generateCommentary(plan.id);
+      
+      if (!commentary || commentary.id === undefined) throw new Error('Commentary creation failed');
+      if (commentary.plan_id !== plan.id) throw new Error('Commentary plan ID mismatch');
+      
+      const parsedScript = JSON.parse(commentary.script_text);
+      if (parsedScript.orig_hook !== 'Welcome!') throw new Error('Script text mismatch');
+      
+      const updatedPlan = await db.getRemixPlan(plan.id);
+      if (updatedPlan.status !== 'scripted') throw new Error('Plan status not updated to scripted');
+      
+      this.logger.info('Remix commentary service test passed');
+    } finally {
+      await db.close();
+    }
+  }
+
+  async testRemixLocalTTSService() {
+    const fs = require('fs').promises;
+    const path = require('path');
+    const os = require('os');
+    
+    const service = new LocalTTSService();
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tts-test-'));
+    const outputPath = path.join(tmpDir, 'output.wav');
+
+    try {
+      const result = await service.generateSpeech('Hello world this is a test', outputPath);
+      if (!result.outputPath) throw new Error('TTS failed to return output path');
+      
+      const stats = await fs.stat(outputPath);
+      if (stats.size === 0) throw new Error('Generated audio file is empty');
+      
+      this.logger.info('Remix local TTS service test passed');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  }
+
+  async testRemixRendererService() {
+    const fs = require('fs').promises;
+    const path = require('path');
+    const os = require('os');
+    const db = new Database();
+    await db.initialize();
+
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'render-test-'));
+
+    try {
+      const source = await db.createRemixSource({ filePath: '/test.mp4', duration: 120 });
+      const plan = await db.createRemixPlan({
+        sourceId: source.id,
+        targetDuration: 2
+      });
+
+      const service = new RemixRendererService(db, { outputDir: tmpDir });
+      const result = await service.renderVideo(plan.id);
+      
+      if (!result.outputPath) throw new Error('Renderer failed to return output path');
+      
+      const stats = await fs.stat(result.outputPath);
+      if (stats.size === 0) throw new Error('Rendered video file is empty');
+      
+      this.logger.info('Remix renderer service test passed');
+    } finally {
+      await db.close();
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  }
+
+  async testRemixMediaEnhancementService() {
+    const service = new MediaEnhancementService();
+    
+    let args = ['-i', 'input.mp4'];
+    args = service.applyEnhancements(args, { denoise: true, colorCorrect: true });
+    
+    if (!args.includes('-vf')) throw new Error('Failed to inject -vf argument');
+    const vfIndex = args.indexOf('-vf');
+    if (!args[vfIndex + 1].includes('hqdn3d') || !args[vfIndex + 1].includes('eq=')) {
+      throw new Error('Failed to apply video filters correctly');
+    }
+    
+    this.logger.info('Remix media enhancement service test passed');
+  }
+
+  async testRemixAudioSyncService() {
+    const service = new AudioSyncService();
+    
+    // Test drift detection
+    const drift = service.detectDrift(10.0, 10.6, 0.5);
+    if (drift === 0) throw new Error('Failed to detect audio drift');
+    
+    // Test tempo calculation
+    const tempo = service.calculateTempoAdjustment(10.0, 15.0);
+    if (tempo !== 1.5) throw new Error(`Incorrect tempo calculation: ${tempo}`);
+    
+    // Test filter string generation
+    const filters = service.getRepairFilters(10.0, 11.0, { method: 'stretch', threshold: 0.5 });
+    if (filters !== 'atempo=1.1000') throw new Error(`Incorrect repair filters: ${filters}`);
+    
+    this.logger.info('Remix audio sync service test passed');
+  }
+
+  async testRemixMetadataService() {
+    const service = new MetadataService({});
+    
+    const args = service.getMetadataArgs({
+      title: 'Test Video',
+      author: 'AgentTube',
+      provenanceId: 'prov_123'
+    });
+    
+    if (!args.includes('-metadata')) throw new Error('Failed to inject -metadata arguments');
+    
+    const hasTitle = args.some(a => a.includes('title=Test Video'));
+    const hasProvenance = args.some(a => a.includes('AgentTubeProvenance:prov_123'));
+    
+    if (!hasTitle || !hasProvenance) throw new Error('Failed to apply metadata tags correctly');
+    
+    // Test verification
+    const probeStub = {
+      format: {
+        tags: {
+          comment: 'AgentTubeProvenance:prov_123'
+        }
+      }
+    };
+    const isValid = await service.verifyProvenance(probeStub);
+    if (!isValid) throw new Error('Failed to verify provenance');
+    
+    this.logger.info('Remix metadata service test passed');
+  }
+
+  async testRemixDeepCleanService() {
+    const service = new DeepCleanService();
+    
+    // Test low bitrate configuration (all filters enabled)
+    const lowBitrateConfig = service.getDeepCleanConfig({ format: { bit_rate: '2000000' } });
+    if (!lowBitrateConfig.video.deblock) throw new Error('Deblock should be enabled for low bitrate');
+    
+    // Test high bitrate configuration (deblock disabled)
+    const highBitrateConfig = service.getDeepCleanConfig({ format: { bit_rate: '8000000' } });
+    if (highBitrateConfig.video.deblock) throw new Error('Deblock should be disabled for high bitrate');
+    
+    // Test argument application
+    let args = ['-i', 'input.mp4'];
+    args = service.applyDeepClean(args, { format: { bit_rate: '2000000' } });
+    
+    if (!args.includes('-vf') || !args.includes('-af')) throw new Error('Failed to inject Deep Clean filters');
+    
+    this.logger.info('Remix deep clean service test passed');
+  }
+
+  async testRemixTransformationQAService() {
+    const db = new Database();
+    await db.initialize();
+    
+    try {
+      const source = await db.createRemixSource({ filePath: '/test.mp4', duration: 100 });
+      const plan = await db.createRemixPlan({
+        sourceId: source.id,
+        targetDuration: 30,
+        sourceSegments: [{ start: 0, end: 10, duration: 10 }, { start: 20, end: 30, duration: 10 }]
+      });
+      const job = await db.createRemixJob({
+        sourceId: source.id,
+        planId: plan.id,
+        status: 'completed',
+        outputPath: '/test_output.mp4'
+      });
+      
+      const service = new TransformationQAService(db);
+      const result = await service.evaluateTransformation(job.id);
+      
+      if (!result.id) throw new Error('Failed to generate QA result');
+      
+      // Source overlap = 20 / 30 = 0.66
+      if (Math.abs(result.source_overlap - 0.666) > 0.01) {
+        throw new Error(`Incorrect source overlap: ${result.source_overlap}`);
+      }
+      
+      this.logger.info('Remix transformation QA service test passed');
+    } finally {
+      await db.close();
+    }
+  }
+
+  async testRemixRecoveryService() {
+    const db = new Database();
+    await db.initialize();
+    
+    try {
+      const job = await db.createRemixJob({
+        status: 'pending',
+        stage: 'transcription'
+      });
+      
+      const service = new RemixRecoveryService(db, { maxRetries: 3 });
+      
+      // Record checkpoint
+      await service.recordCheckpoint(job.id, 'transcription', 'failed', null, new Error('Test error'));
+      
+      let canRecover = await service.canRecover(job.id);
+      if (!canRecover) throw new Error('Should be able to recover after 1 failure');
+      
+      // Record more failures
+      await service.recordCheckpoint(job.id, 'transcription', 'failed');
+      await service.recordCheckpoint(job.id, 'transcription', 'failed');
+      
+      canRecover = await service.canRecover(job.id);
+      if (canRecover) throw new Error('Should NOT be able to recover after 3 failures');
+      
+      // Test getResumeStage
+      await service.recordCheckpoint(job.id, 'init', 'completed');
+      await service.recordCheckpoint(job.id, 'analysis', 'completed');
+      const resumeStage = await service.getResumeStage(job.id);
+      if (resumeStage !== 'transcription') throw new Error(`Incorrect resume stage: ${resumeStage}`);
+      
+      this.logger.info('Remix recovery service test passed');
+    } finally {
+      await db.close();
+    }
+  }
+
+  async testRemixPromotionAgent() {
+    const db = new Database();
+    await db.initialize();
+    
+    // Create a mock AITextService
+    const mockAITextService = {
+      isAvailable: () => true,
+      generateText: async (prompt) => {
+        if (prompt.includes('HIGHLIGHT SELECTION')) {
+          return JSON.stringify([
+            { id: 0, reason: "Good hook", hookStrength: 0.9, contextCompleteness: 0.8 },
+            { id: 1, reason: "Interesting point", hookStrength: 0.6, contextCompleteness: 0.9 }
+          ]);
+        }
+        return JSON.stringify({
+          "orig_hook": "Welcome to the remix!",
+          "orig_outro": "Thanks for watching!"
+        });
+      }
+    };
+    
+    try {
+      const source = await db.createRemixSource({ filePath: '/test.mp4', duration: 100 });
+      const job = await db.createRemixJob({
+        sourceId: source.id,
+        status: 'pending'
+      });
+      
+      const agent = new RemixPromotionAgent(db, mockAITextService);
+      
+      // We'll mock the internal services that would otherwise run actual FFmpeg/Whisper
+      // Just mock the heavy external calls on the services
+      agent.analysisService.analyzeSource = async () => ({ scenes: [] });
+      agent.transcriptService.generateTranscript = async (id) => {
+        return await db.saveRemixTranscript({
+          sourceId: id,
+          status: 'completed',
+          provider: 'whisper',
+          fullText: 'Hello world, this is a test of the video. This is a test of the highlight selection service. It should be able to pick up this sentence and understand that this is a great highlight because it is very informative and has enough words. Wow this is amazing, and I cannot wait to see what happens next in this incredible video.',
+          segments: [
+            { start: 0, end: 5, text: 'Hello world, this is a test of the video.' },
+            { start: 5, end: 25, text: 'This is a test of the highlight selection service. It should be able to pick up this sentence and understand that this is a great highlight because it is very informative and has enough words.' },
+            { start: 25, end: 40, text: 'Wow this is amazing, and I cannot wait to see what happens next in this incredible video.' }
+          ]
+        });
+      };
+      agent.rendererService.renderVideo = async (planId) => ({ outputPath: '/test_render.mp4', duration: 10 });
+      
+      await agent.runJob(job.id);
+      
+      const updatedJob = await db.getRow('SELECT * FROM remix_jobs WHERE id = ?', [job.id]);
+      if (updatedJob.status !== 'completed') throw new Error(`Job did not complete. Status: ${updatedJob.status}, Stage: ${updatedJob.stage}, Error: ${updatedJob.error}`);
+      if (!updatedJob.output_path) throw new Error('Job output path not set');
+      
+      const qaResults = await db.getAllRows('SELECT * FROM remix_qa_results WHERE job_id = ?', [job.id]);
+      if (qaResults.length === 0) throw new Error('QA results not generated');
+      
+      this.logger.info('Remix promotion agent test passed');
+    } finally {
+      await db.close();
+    }
   }
 }
 
