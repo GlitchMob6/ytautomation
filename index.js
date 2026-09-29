@@ -11,27 +11,23 @@ const { ScriptWriterAgent } = require('./agents/script-writer-agent');
 const { ThumbnailDesignerAgent } = require('./agents/thumbnail-designer-agent');
 const { SEOOptimizerAgent } = require('./agents/seo-optimizer-agent');
 const { ProductionManagementAgent } = require('./agents/production-management-agent');
-const { PublishingSchedulingAgent } = require('./agents/publishing-scheduling-agent');
-const { AnalyticsOptimizationAgent } = require('./agents/analytics-optimization-agent');
-const { DailyAutomation } = require('./schedules/daily-automation');
+// YouTube-specific agents removed — content-only mode
+// const { PublishingSchedulingAgent } = require('./agents/publishing-scheduling-agent');
+// const { AnalyticsOptimizationAgent } = require('./agents/analytics-optimization-agent');
 const { OperatorService } = require('./utils/operator-service');
-const { AutonomousChannelOperator } = require('./utils/autonomous-channel-operator');
 const { ActivationMetrics } = require('./utils/activation-metrics');
 const { AnonymousTelemetry } = require('./utils/anonymous-telemetry');
 const { ProductionReadinessService } = require('./utils/production-readiness-service');
 const { GenerationRecoveryService, GENERATION_STAGES } = require('./utils/generation-recovery-service');
 const { ProvenanceService } = require('./utils/provenance-service');
 const { SceneRepairService } = require('./utils/scene-repair-service');
-const { ShortsRepurposingService } = require('./utils/shorts-repurposing-service');
-const { AudienceEngagementService } = require('./utils/audience-engagement-service');
-const { GrowthExperimentService } = require('./utils/growth-experiment-service');
 const { AITextService } = require('./utils/ai-text-service');
 const { DiscoverabilityService } = require('./utils/discoverability-service');
-const { RemixPromotionAgent } = require('./agents/remix-promotion-agent');
+const { mountWalkthroughAPI } = require('./walkthrough-api');
 const { version } = require('./package.json');
 const chalk = require('chalk');
 
-class YouTubeAutomationAgent {
+class ContentGeneratorAgent {
   constructor() {
     this.logger = new Logger('MainAgent');
     this.db = null;
@@ -41,23 +37,19 @@ class YouTubeAutomationAgent {
     this.isInitialized = false;
     this.activeJobs = new Map();
     this.operator = null;
-    this.autonomous = null;
     this.activation = null;
     this.telemetry = null;
     this.readiness = null;
     this.recovery = null;
     this.provenance = null;
     this.scenes = null;
-    this.shorts = null;
-    this.engagement = null;
-    this.experiments = null;
     this.discoverability = null;
     this.setupRequired = false;
   }
 
   async initialize() {
     try {
-      console.log(chalk.cyan.bold(`\n🎬 YouTube Automation Agent v${version}`));
+      console.log(chalk.cyan.bold(`\n🎨 Lumen Content Studio v${version}`));
       console.log(chalk.gray('─'.repeat(50)));
       
       // Initialize database
@@ -72,16 +64,6 @@ class YouTubeAutomationAgent {
       this.operator = new OperatorService(this.db);
       this.provenance = new ProvenanceService(this.db);
       this.discoverability = new DiscoverabilityService(this.db, { logger: this.logger });
-      this.autonomous = new AutonomousChannelOperator(this.db, {
-        researchAndPlan: strategy => {
-          if (!this.agents.strategy) throw new Error('The strategy agent is not configured');
-          return this.agents.strategy.researchAndPlanChannel(strategy);
-        },
-        startGenerationJob: input => this.startGenerationJob(input),
-        resumeGenerationJob: (jobId, options) => this.resumeGenerationJob(jobId, options),
-        waitForGenerationJob: jobId => this.waitForGenerationJob(jobId),
-        notify: notification => this.operator.notify(notification)
-      });
       this.activation = new ActivationMetrics(this.db);
       this.telemetry = new AnonymousTelemetry(this.db, this.logger);
       
@@ -109,23 +91,8 @@ class YouTubeAutomationAgent {
         this.agents.production?.aiVideoGenerator,
         { logger: this.logger }
       );
-      this.shorts = new ShortsRepurposingService(this.db, this.agents.publishing, { logger: this.logger });
       
       this.aiTextService = new AITextService(this.credentials?.credentials || {});
-      this.remixAgent = new RemixPromotionAgent(this.db, this.aiTextService, { logger: this.logger });
-
-      this.engagement = new AudienceEngagementService(
-        this.db,
-        this.credentials,
-        this.aiTextService,
-        { logger: this.logger }
-      );
-      this.experiments = new GrowthExperimentService(
-        this.db,
-        this.agents.analytics,
-        this.agents.publishing,
-        { logger: this.logger }
-      );
 
       // Show which pipeline stages will run for real vs. be simulated
       const capabilities = await this.logCapabilitySummary();
@@ -135,23 +102,16 @@ class YouTubeAutomationAgent {
       
       // Setup API endpoints
       this.setupAPI();
-      this.setupRemixAPI();
       
-      // Initialize scheduler
-      this.logger.info('Setting up automation scheduler...');
-      this.scheduler = new DailyAutomation(this.agents, this.db, {
-        generateContent: input => this.queueScheduledContent(input),
-        engagement: this.engagement,
-        experiments: this.experiments
-      });
-      await this.scheduler.initialize();
-
-      if (await this.db.getSetting('automation_paused') === 'true') {
-        await this.scheduler.pauseAutomation();
-      }
+      // Ensure output directory exists
+      await fs.mkdir(path.join(__dirname, 'output'), { recursive: true });
+      await fs.mkdir(path.join(__dirname, 'output', 'scripts'), { recursive: true });
+      await fs.mkdir(path.join(__dirname, 'output', 'thumbnails'), { recursive: true });
+      await fs.mkdir(path.join(__dirname, 'output', 'videos'), { recursive: true });
+      await fs.mkdir(path.join(__dirname, 'output', 'metadata'), { recursive: true });
       
       this.isInitialized = true;
-      this.logger.success('YouTube Automation Agent initialized successfully!');
+      this.logger.success('Lumen Content Studio initialized successfully!');
       
       return true;
     } catch (error) {
@@ -166,9 +126,10 @@ class YouTubeAutomationAgent {
       scriptWriter: new ScriptWriterAgent(this.db, this.credentials),
       thumbnailDesigner: new ThumbnailDesignerAgent(this.db, this.credentials),
       seoOptimizer: new SEOOptimizerAgent(this.db, this.credentials),
-      production: new ProductionManagementAgent(this.db, this.credentials),
-      publishing: new PublishingSchedulingAgent(this.db, this.credentials),
-      analytics: new AnalyticsOptimizationAgent(this.db, this.credentials)
+      production: new ProductionManagementAgent(this.db, this.credentials)
+      // YouTube-specific agents removed:
+      // publishing: new PublishingSchedulingAgent(this.db, this.credentials),
+      // analytics: new AnalyticsOptimizationAgent(this.db, this.credentials)
     };
 
     // Initialize each agent
@@ -198,8 +159,8 @@ class YouTubeAutomationAgent {
       { name: 'Script & strategy generation', ok: hasText, hint: 'configure an AI provider (npm run credentials:setup)' },
       { name: 'Image generation (visuals/thumbnails)', ok: hasImages, hint: 'requires an OpenAI or Gemini API key — otherwise gradient slides are used' },
       { name: 'Voice narration (TTS)', ok: hasTTS, hint: 'configure OpenAI, Gemini, ElevenLabs, or Azure Speech — otherwise videos are silent' },
-      { name: 'Video assembly (FFmpeg)', ok: hasFFmpeg, hint: ffmpegInstallHint() },
-      { name: 'YouTube upload', ok: hasUpload, hint: 'run: npm run credentials:setup' }
+      { name: 'Video assembly (FFmpeg)', ok: hasFFmpeg, hint: ffmpegInstallHint() }
+      // YouTube upload check removed — content-only mode
     ];
 
     console.log(chalk.cyan('\n🔎 Capability check:'));
@@ -381,6 +342,9 @@ class YouTubeAutomationAgent {
   setupAPI() {
     this.app.use(express.json({ limit: '1mb' }));
     this.app.use(express.static(path.join(__dirname, 'dashboard')));
+    
+    // Mount walkthrough GUI API
+    mountWalkthroughAPI(this.app);
 
     if (!process.env.API_KEY) {
       this.logger.warn('API_KEY is not set; mutating API routes are unprotected');
@@ -422,30 +386,21 @@ class YouTubeAutomationAgent {
       }
     });
 
-    // Get analytics
+    // Get generation stats (replaces YouTube analytics)
     this.app.get('/analytics', async (req, res) => {
       try {
-        if (!this.agents.analytics) return res.json({ totalVideos: 0, averagePerformanceScore: 0, topPerformers: [], insights: [], learning: null });
-        const analytics = await this.agents.analytics.getRecentAnalytics();
-        const learning = await this.agents.analytics.getLearningSummary();
-        res.json({ ...analytics, learning });
+        const stats = await this.db.getStats();
+        res.json({ totalVideos: stats?.totalContent || 0, averagePerformanceScore: 0, topPerformers: [], insights: [], learning: null });
       } catch (error) {
         res.status(500).json({ error: error.message });
       }
     });
 
     this.app.get('/api/outcomes', async (_req, res) => {
-      try {
-        const learning = this.agents.analytics?.getLearningSummary
-          ? await this.agents.analytics.getLearningSummary()
-          : { outcome: null };
-        return res.json({ success: true, result: learning.outcome || null });
-      } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
-      }
+      return res.json({ success: true, result: null });
     });
 
-    // Get upcoming schedule
+    // Get generated content list
     this.app.get('/schedule', async (req, res) => {
       try {
         const schedule = await this.db.getUpcomingSchedule();
@@ -455,18 +410,14 @@ class YouTubeAutomationAgent {
       }
     });
 
-    // Manual publish
+    // Export content to output folder (replaces YouTube publish)
     this.app.post('/publish/:contentId', this.requireAPIKey(), async (req, res) => {
       try {
-        if (!this.agents.publishing) return res.status(503).json({ success: false, error: 'YouTube publishing is not configured' });
         const { contentId } = req.params;
         const bundle = await this.db.getProductionBundle(contentId);
-        const short = bundle ? null : await this.db.getShortClip(contentId);
-        if ((!bundle || bundle.review_status !== 'approved') && (!short || !['scheduled', 'uploading', 'reconciliation_required'].includes(short.status))) {
-          return res.status(409).json({ success: false, error: 'Content must pass review and be approved before publishing' });
-        }
-        const result = await this.agents.publishing.publishContent(contentId);
-        res.json({ success: true, result });
+        if (!bundle) return res.status(404).json({ success: false, error: 'Content not found' });
+        const exported = await this.exportContentLocally(bundle);
+        res.json({ success: true, result: { message: 'Content exported to output folder', ...exported } });
       } catch (error) {
         res.status(error.status || 500).json({ success: false, error: error.message });
       }
@@ -552,7 +503,7 @@ class YouTubeAutomationAgent {
 
     this.app.get('/api/dashboard', async (_req, res) => {
       try {
-        const [stats, jobs, pipeline, schedule, events, notifications, profile, settings, ideas, analytics, learning, activation, channelStrategy, operatorRuns, readiness, engagement, experiments] = await Promise.all([
+        const [stats, jobs, pipeline, schedule, events, notifications, profile, settings, ideas, activation, channelStrategy, readiness] = await Promise.all([
           this.db.getStats(),
           this.db.listGenerationJobs(20),
           this.db.getPipelineOverview(50),
@@ -562,44 +513,33 @@ class YouTubeAutomationAgent {
           this.db.getChannelProfile(),
           this.db.getAllSettings(),
           this.db.listContentIdeas(),
-          this.agents.analytics
-            ? this.agents.analytics.getRecentAnalytics(30)
-            : Promise.resolve({ totalVideos: 0, averagePerformanceScore: 0, topPerformers: [], insights: [] }),
-          this.agents.analytics?.getLearningSummary
-            ? this.agents.analytics.getLearningSummary()
-            : Promise.resolve({ measuredVideos: 0, snapshotCount: 0, baseline: {}, recommendations: [], approvedCount: 0, pendingCount: 0 }),
           this.activation
             ? this.activation.getSummary()
             : Promise.resolve({ privacy: 'local-only', counts: {}, milestones: {} }),
           this.db.getChannelStrategy(),
-          this.db.listOperatorRuns(10),
           this.readiness
             ? this.readiness.getSummary()
-            : Promise.resolve({ status: 'unverified', stale: false, blockingFailures: [], checks: [] }),
-          this.engagement
-            ? this.engagement.getSummary()
-            : Promise.resolve({
-                videosTracked: 0, pendingDrafts: 0, postedToday: 0, needsAttentionCount: 0,
-                pendingAudienceIdeas: 0, postingEnabled: false, postingDisabledReason: 'setup_required',
-                insights: [], recentThemes: [],
-                evidencePolicy: 'Comments are fetched read-only from YouTube. Replies post only after operator approval, and fallback analysis never proposes drafts or ideas.'
-              }),
-          this.experiments
-            ? this.experiments.getSummary()
-            : Promise.resolve({ experiments: [], candidates: [], activeCount: 0, awaitingDecisionCount: 0, evidencePolicy: 'Finish setup to create a controlled growth experiment.' })
+            : Promise.resolve({ status: 'unverified', stale: false, blockingFailures: [], checks: [] })
         ]);
         if (this.telemetry) void this.telemetry.sync(activation);
+        // Provide defaults for removed YouTube features so the dashboard JS doesn't crash
+        const analytics = { totalVideos: 0, averagePerformanceScore: 0, topPerformers: [], insights: [] };
+        const learning = { measuredVideos: 0, snapshotCount: 0, baseline: {}, recommendations: [], approvedCount: 0, pendingCount: 0 };
+        const engagement = { videosTracked: 0, pendingDrafts: 0, postedToday: 0, needsAttentionCount: 0, pendingAudienceIdeas: 0, postingEnabled: false, postingDisabledReason: 'content_only_mode', insights: [], recentThemes: [] };
+        const experiments = { experiments: [], candidates: [], activeCount: 0, awaitingDecisionCount: 0 };
+        const operatorRuns = [];
         res.json({
           stats, jobs, pipeline, schedule, events, notifications, profile, settings, ideas, analytics, learning, activation,
           channelStrategy, operatorRuns, readiness, engagement, experiments,
           system: {
             initialized: this.isInitialized,
             setupRequired: this.setupRequired,
+            contentOnlyMode: true,
             uptime: process.uptime(),
             activeJobs: this.activeJobs.size,
-            automationPaused: this.scheduler ? !this.scheduler.isEnabled : true,
+            automationPaused: true,
             agents: Object.keys(this.agents),
-            autonomousRunning: Boolean(await this.db.getActiveOperatorRun()),
+            autonomousRunning: false,
             videoProviders: this.agents.production?.aiVideoGenerator?.mediaGeneration?.listProviders() || []
           }
         });
@@ -1621,8 +1561,9 @@ class YouTubeAutomationAgent {
 
       let scheduleEntry = null;
       if (reviewStatus === 'approved') {
-        scheduleEntry = await this.agents.publishing.scheduleContent(productionData);
-        await this.db.updateProductionStatus(contentId, scheduleEntry ? 'scheduled' : productionData.status);
+        // Content-only mode: export locally instead of scheduling a YouTube upload
+        await this.exportContentLocally(productionData);
+        await this.db.updateProductionStatus(contentId, 'completed');
       } else {
         await this.db.updateProductionStatus(contentId, reviewStatus);
         await this.operator.notify({
@@ -1640,7 +1581,7 @@ class YouTubeAutomationAgent {
         status: productionData.status,
         reviewStatus,
         qualityScore: quality.score,
-        scheduledFor: scheduleEntry ? scheduleEntry.publishTime : null
+        exportedTo: reviewStatus === 'approved' ? path.join(__dirname, 'output') : null
       };
     });
   }
@@ -1862,43 +1803,81 @@ class YouTubeAutomationAgent {
       throw error;
     }
 
-    let scheduleEntry = bundle.schedule;
-    if (!scheduleEntry) {
-      scheduleEntry = await this.agents.publishing.scheduleContent(productionData);
-    } else if (scheduleEntry.status !== 'published') {
-      scheduleEntry.title = productionData.script.title;
-      scheduleEntry.publishTime = productionData.scheduledPublishTime;
-      scheduleEntry.status = 'scheduled';
-      scheduleEntry.metadata = {
-        ...scheduleEntry.metadata,
-        seo: productionData.seo,
-        thumbnail: productionData.assets.thumbnail,
-        video: productionData.assets.finalVideo,
-        audio: productionData.assets.audio,
-        captions: productionData.assets.captions,
-        privacyStatus: editorData.privacyStatus || process.env.DEFAULT_PRIVACY_STATUS || 'private',
-        containsSyntheticMedia: productionData.containsSyntheticMedia
-      };
-      await this.db.updateScheduleEntry(scheduleEntry);
-      await this.agents.publishing.loadPublishQueue();
-    }
-    if (!scheduleEntry) {
-      const error = new Error('A real MP4 is required before content can be approved for scheduling');
-      error.status = 409;
-      throw error;
-    }
+    // Content-only mode: export locally instead of scheduling a YouTube upload
+    const exported = await this.exportContentLocally(productionData);
 
     await this.db.saveContentReview(bundle.id, {
       status: 'approved', editorData, qualityChecks: quality.checks,
       reviewNotes: input.reviewNotes || 'Approved by operator', reviewedAt: new Date().toISOString()
     });
-    await this.db.updateProductionStatus(bundle.id, 'scheduled');
+    await this.db.updateProductionStatus(bundle.id, 'completed');
     await this.operator.notify({
-      type: 'content_approved', level: 'success', title: 'Content approved',
-      message: `${productionData.script.title} is scheduled for ${scheduleEntry.publishTime}`,
-      data: { productionId, publishTime: scheduleEntry.publishTime }
+      type: 'content_approved', level: 'success', title: 'Content approved & exported',
+      message: `${productionData.script.title} has been exported to the output folder`,
+      data: { productionId, exported }
     });
-    return { productionId, reviewStatus: 'approved', qualityScore: quality.score, schedule: scheduleEntry };
+    return { productionId, reviewStatus: 'approved', qualityScore: quality.score, exported };
+  }
+
+  /**
+   * Export generated content to the local output/ folder.
+   * Copies video, thumbnail, script, and SEO metadata.
+   */
+  async exportContentLocally(bundle) {
+    const outputDir = path.join(__dirname, 'output');
+    const slug = (bundle.script?.title || bundle.seo?.title || bundle.id || 'content')
+      .replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase().slice(0, 60);
+    const exported = { slug, files: [] };
+
+    // Export script as markdown
+    if (bundle.script) {
+      const scriptPath = path.join(outputDir, 'scripts', `${slug}.md`);
+      const scriptContent = [
+        `# ${bundle.script.title || 'Untitled'}`,
+        '',
+        bundle.script.hook ? `## Hook\n${bundle.script.hook}\n` : '',
+        ...(bundle.script.sections || []).map((s, i) => `## Section ${i + 1}: ${s.title || ''}\n${s.content || s.narration || ''}\n`),
+        bundle.script.callToAction ? `## Call to Action\n${bundle.script.callToAction}\n` : ''
+      ].filter(Boolean).join('\n');
+      await fs.writeFile(scriptPath, scriptContent, 'utf8');
+      exported.files.push(scriptPath);
+    }
+
+    // Export SEO metadata as JSON
+    if (bundle.seo) {
+      const metaPath = path.join(outputDir, 'metadata', `${slug}.json`);
+      await fs.writeFile(metaPath, JSON.stringify({
+        title: bundle.seo.title,
+        description: bundle.seo.description,
+        tags: bundle.seo.tags,
+        category: bundle.seo.category,
+        generatedAt: new Date().toISOString()
+      }, null, 2), 'utf8');
+      exported.files.push(metaPath);
+    }
+
+    // Copy thumbnail
+    if (bundle.assets?.thumbnail?.path) {
+      try {
+        const ext = path.extname(bundle.assets.thumbnail.path) || '.png';
+        const thumbDest = path.join(outputDir, 'thumbnails', `${slug}${ext}`);
+        await fs.copyFile(bundle.assets.thumbnail.path, thumbDest);
+        exported.files.push(thumbDest);
+      } catch (e) { this.logger.warn(`Thumbnail export skipped: ${e.message}`); }
+    }
+
+    // Copy video
+    if (bundle.assets?.finalVideo?.path && !bundle.assets?.finalVideo?.simulated) {
+      try {
+        const ext = path.extname(bundle.assets.finalVideo.path) || '.mp4';
+        const vidDest = path.join(outputDir, 'videos', `${slug}${ext}`);
+        await fs.copyFile(bundle.assets.finalVideo.path, vidDest);
+        exported.files.push(vidDest);
+      } catch (e) { this.logger.warn(`Video export skipped: ${e.message}`); }
+    }
+
+    this.logger.info(`Exported ${exported.files.length} files for "${slug}" to output/`);
+    return exported;
   }
 
   async start() {
@@ -1911,17 +1890,16 @@ class YouTubeAutomationAgent {
     
     const PORT = process.env.PORT || 3456;
     this.app.listen(PORT, () => {
-      console.log(chalk.green(`\n✅ YouTube Automation Agent running on port ${PORT}`));
+      console.log(chalk.green(`\n✅ Lumen Content Studio running on port ${PORT}`));
       console.log(chalk.gray('─'.repeat(50)));
       console.log(chalk.white('📊 Dashboard: ') + chalk.cyan(`http://localhost:${PORT}`));
       console.log(chalk.white('🔧 API Health: ') + chalk.cyan(`http://localhost:${PORT}/health`));
-      console.log(chalk.white('📅 Schedule: ') + chalk.cyan(`http://localhost:${PORT}/schedule`));
-      console.log(chalk.white('📈 Analytics: ') + chalk.cyan(`http://localhost:${PORT}/analytics`));
+      console.log(chalk.white('📁 Output:    ') + chalk.cyan(path.join(__dirname, 'output')));
       console.log(chalk.gray('─'.repeat(50)));
       if (this.setupRequired) {
         console.log(chalk.yellow('\n⚙️  Setup is required. The dashboard is available; run npm run walkthrough to enable generation.'));
       } else {
-        console.log(chalk.yellow('\n🤖 Automation is active. Approved content will be published on schedule.'));
+        console.log(chalk.yellow('\n🎨 Content-only mode. Generated content is saved to the output/ folder.'));
       }
     });
   }
@@ -1929,11 +1907,11 @@ class YouTubeAutomationAgent {
 
 // Start the agent
 if (require.main === module) {
-  const agent = new YouTubeAutomationAgent();
+  const agent = new ContentGeneratorAgent();
   agent.start().catch(error => {
     console.error(chalk.red('Fatal error:'), error);
     process.exit(1);
   });
 }
 
-module.exports = { YouTubeAutomationAgent };
+module.exports = { ContentGeneratorAgent };

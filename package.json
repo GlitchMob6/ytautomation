@@ -1,7 +1,7 @@
 {
-  "name": "youtube-automation-agent",
-  "version": "2.10.0",
-  "description": "Lumen is an open-source AI agent that runs a YouTube channel end to end",
+  "name": "content-generator",
+  "version": "3.0.0",
+  "description": "Lumen Content Studio — AI-powered content generation (scripts, thumbnails, videos, SEO metadata)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -15,8 +15,7 @@
     "agent:thumbnail": "node agents/thumbnail-designer-agent.js",
     "agent:seo": "node agents/seo-optimizer-agent.js",
     "agent:production": "node agents/production-management-agent.js",
-    "agent:publishing": "node agents/publishing-scheduling-agent.js",
-    "agent:analytics": "node agents/analytics-optimization-agent.js",
+
     "credentials:setup": "node utils/credential-manager.js setup",
     "lint": "eslint ."
   },

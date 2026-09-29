@@ -525,9 +525,10 @@ class CredentialManager {
   getMissingCredentials() {
     const missing = [];
 
-    if (!this.credentials.youtube) {
-      missing.push('youtube');
-    }
+    // YouTube credentials no longer required in content-only mode
+    // if (!this.credentials.youtube) {
+    //   missing.push('youtube');
+    // }
 
     if (!this.hasAITextProvider()) {
       missing.push('an AI provider (OpenAI, Gemini, OpenRouter, Kimi, MiMo, or GLM)');
@@ -552,12 +553,7 @@ class CredentialManager {
       return false;
     }
 
-    // Validate YouTube tokens
-    if (!this.tokens.youtube) {
-      console.log(chalk.yellow('\n⚠️  YouTube authentication required'));
-      return false;
-    }
-
+    // YouTube tokens no longer required in content-only mode
     return true;
   }
 

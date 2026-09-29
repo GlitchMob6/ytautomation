@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Lumen Content Studio — Setup Wizard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #06080c;
+      --surface: rgba(255,255,255,0.04);
+      --surface-hover: rgba(255,255,255,0.07);
+      --surface-active: rgba(255,255,255,0.10);
+      --border: rgba(255,255,255,0.08);
+      --border-bright: rgba(255,255,255,0.15);
+      --text: #e8eaed;
+      --text-dim: #9aa0a6;
+      --text-faint: #5f6368;
+      --accent: #7c6aff;
+      --accent-glow: rgba(124,106,255,0.25);
+      --success: #34d399;
+      --warning: #fbbf24;
+      --error: #f87171;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .bg-glow {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 60% 50% at 20% 10%, rgba(124,106,255,0.08), transparent),
+        radial-gradient(ellipse 50% 40% at 80% 80%, rgba(52,211,153,0.06), transparent);
+    }
+
+    .wizard-container {
+      position: relative; z-index: 1;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    .wizard-header { text-align: center; margin-bottom: 48px; }
+    .wizard-header h1 {
+      font-size: 2rem; font-weight: 800; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #e8eaed 30%, var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .wizard-header p { color: var(--text-dim); margin-top: 8px; font-size: 0.95rem; }
+
+    .progress-bar { display: flex; gap: 8px; margin-bottom: 40px; }
+    .progress-step {
+      flex: 1; height: 4px; border-radius: 4px;
+      background: var(--surface); transition: background 0.5s ease;
+    }
+    .progress-step.active { background: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+    .progress-step.done { background: var(--success); }
+    .progress-labels { display: flex; gap: 8px; margin-bottom: 32px; }
+    .progress-label {
+      flex: 1; text-align: center; font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); transition: color 0.3s;
+    }
+    .progress-label.active { color: var(--accent); }
+    .progress-label.done { color: var(--success); }
+
+    .step { display: none; animation: fadeUp 0.4s ease forwards; }
+    .step.active { display: block; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+    .step-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; }
+    .step-desc { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 28px; line-height: 1.5; }
+
+    .panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
+      backdrop-filter: blur(20px);
+    }
+
+    .check-list { list-style: none; }
+    .check-list li {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;
+    }
+    .check-list li:last-child { border-bottom: none; }
+    .check-icon {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0;
+    }
+    .check-icon.ok { background: rgba(52,211,153,0.15); color: var(--success); }
+    .check-icon.warn { background: rgba(251,191,36,0.15); color: var(--warning); }
+    .check-icon.loading { background: rgba(124,106,255,0.15); color: var(--accent); animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .provider-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+    @media (max-width: 540px) { .provider-grid { grid-template-columns: 1fr; } }
+    .provider-card {
+      background: var(--surface); border: 2px solid var(--border);
+      border-radius: var(--radius-sm); padding: 16px; cursor: pointer;
+      transition: all 0.2s ease; text-align: left;
+    }
+    .provider-card:hover { background: var(--surface-hover); border-color: var(--border-bright); }
+    .provider-card.selected {
+      border-color: var(--accent); background: rgba(124,106,255,0.08);
+      box-shadow: 0 0 20px rgba(124,106,255,0.12);
+    }
+    .provider-card h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+    .provider-card small { font-size: 0.75rem; color: var(--text-dim); line-height: 1.4; }
+    .badge-free {
+      display: inline-block; background: rgba(52,211,153,0.15); color: var(--success);
+      font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+      margin-left: 6px; vertical-align: middle;
+    }
+
+    .form-group { margin-bottom: 20px; }
+    .form-group label {
+      display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-dim);
+      margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 12px 14px; background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--text); font-family: inherit; font-size: 0.9rem;
+      transition: border-color 0.2s; outline: none;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .form-group select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa0a6' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px;
+    }
+    .form-hint { font-size: 0.75rem; color: var(--text-faint); margin-top: 4px; }
+    .form-hint a { color: var(--accent); }
+    .key-input-row { display: flex; gap: 8px; }
+    .key-input-row input { flex: 1; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 24px; border: none; border-radius: var(--radius-sm);
+      font-family: inherit; font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; transition: all 0.2s ease; text-decoration: none;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #6b59e8; box-shadow: 0 4px 20px var(--accent-glow); transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--surface-hover); border-color: var(--border-bright); }
+    .btn-test {
+      background: rgba(52,211,153,0.12); color: var(--success);
+      border: 1px solid rgba(52,211,153,0.2); padding: 12px 18px; white-space: nowrap;
+    }
+    .btn-test:hover { background: rgba(52,211,153,0.2); }
+    .btn-test:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .step-actions { display: flex; justify-content: space-between; margin-top: 32px; gap: 12px; }
+    .step-actions .right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+    .status-msg {
+      padding: 12px 16px; border-radius: var(--radius-sm); font-size: 0.85rem;
+      margin-top: 12px; display: none;
+    }
+    .status-msg.show { display: flex; align-items: center; gap: 8px; }
+    .status-msg.success { background: rgba(52,211,153,0.1); color: var(--success); border: 1px solid rgba(52,211,153,0.2); }
+    .status-msg.error { background: rgba(248,113,113,0.1); color: var(--error); border: 1px solid rgba(248,113,113,0.2); }
+    .status-msg.info { background: rgba(124,106,255,0.1); color: var(--accent); border: 1px solid rgba(124,106,255,0.2); }
+
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px 0; }
+    @media (max-width: 540px) { .summary-grid { grid-template-columns: 1fr; } }
+    .summary-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 18px;
+    }
+    .summary-card .label {
+      font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-faint); margin-bottom: 6px;
+    }
+    .summary-card .value { font-size: 1rem; font-weight: 600; }
+    .summary-card .value.ok { color: var(--success); }
+    .summary-card .value.miss { color: var(--text-faint); }
+
+    .launch-section { text-align: center; margin-top: 40px; }
+    .launch-section .btn-primary { font-size: 1.1rem; padding: 16px 40px; border-radius: 12px; }
+    .launch-section p { color: var(--text-dim); font-size: 0.85rem; margin-top: 12px; }
+    .launch-section code { color: var(--accent); }
+
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid transparent;
+      border-top-color: currentColor; border-radius: 50%;
+      animation: spin 0.6s linear infinite; display: inline-block;
+    }
+    .skip-link {
+      color: var(--text-faint); font-size: 0.8rem; cursor: pointer;
+      background: none; border: none; font-family: inherit;
+      text-decoration: underline; text-underline-offset: 3px;
+    }
+    .skip-link:hover { color: var(--text-dim); }
+  </style>
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="wizard-container">
+    <div class="wizard-header">
+      <h1>🎨 Lumen Content Studio</h1>
+      <p>Let's get your content generator up and running</p>
+    </div>
+
+    <div class="progress-bar">
+      <div class="progress-step active" data-step="0"></div>
+      <div class="progress-step" data-step="1"></div>
+      <div class="progress-step" data-step="2"></div>
+      <div class="progress-step" data-step="3"></div>
+      <div class="progress-step" data-step="4"></div>
+    </div>
+    <div class="progress-labels">
+      <div class="progress-label active" data-step="0">System</div>
+      <div class="progress-label" data-step="1">AI Provider</div>
+      <div class="progress-label" data-step="2">Video</div>
+      <div class="progress-label" data-step="3">Project</div>
+      <div class="progress-label" data-step="4">Done</div>
+    </div>
+
+    <!-- Step 0: System Check -->
+    <div class="step active" data-step="0">
+      <h2 class="step-title">Checking your system</h2>
+      <p class="step-desc">Making sure everything is ready for content generation.</p>
+      <div class="panel">
+        <ul class="check-list" id="system-checks">
+          <li><span class="check-icon loading">⟳</span><span>Checking Node.js version…</span></li>
+          <li><span class="check-icon loading">⟳</span><span>Checking FFmpeg…</span></li>
+          <li><span class="check-icon loading">⟳</span><span>Initializing database…</span></li>
+          <li><span class="check-icon loading">⟳</span><span>Creating project folders…</span></li>
+        </ul>
+      </div>
+      <div class="step-actions"><div></div><div class="right">
+        <button class="btn btn-primary" id="btn-next-0" disabled>Continue →</button>
+      </div></div>
+    </div>
+
+    <!-- Step 1: AI Provider -->
+    <div class="step" data-step="1">
+      <h2 class="step-title">Choose your AI provider</h2>
+      <p class="step-desc">This powers script writing, image generation, and voice narration. One key is all you need.</p>
+      <div class="provider-grid" id="ai-providers"></div>
+      <div class="panel" id="ai-key-panel" style="display:none">
+        <div class="form-group">
+          <label id="ai-key-label">API Key</label>
+          <div class="key-input-row">
+            <input type="password" id="ai-key-input" placeholder="Paste your API key here" autocomplete="off">
+            <button class="btn btn-test" id="btn-test-key" disabled>Test key</button>
+          </div>
+          <p class="form-hint" id="ai-key-hint"></p>
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="ai-model-select"></select>
+        </div>
+        <div class="status-msg" id="ai-key-status"></div>
+      </div>
+      <div class="step-actions">
+        <button class="btn btn-secondary" onclick="goStep(0)">← Back</button>
+        <div class="right">
+          <button class="skip-link" onclick="goStep(2)">Skip for now</button>
+          <button class="btn btn-primary" id="btn-next-1" disabled>Save & Continue →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Video Provider -->
+    <div class="step" data-step="2">
+      <h2 class="step-title">Video generation</h2>
+      <p class="step-desc">Choose how videos are assembled. The local slideshow is free and works immediately.</p>
+      <div class="provider-grid" id="video-providers"></div>
+      <div class="panel" id="video-key-panel" style="display:none">
+        <div class="form-group">
+          <label id="video-key-label">API Key</label>
+          <input type="password" id="video-key-input" placeholder="Paste your API key" autocomplete="off">
+          <p class="form-hint" id="video-key-hint"></p>
+        </div>
+        <div id="video-secret-group" class="form-group" style="display:none">
+          <label id="video-secret-label">Secret Key</label>
+          <input type="password" id="video-secret-input" placeholder="Paste your secret key" autocomplete="off">
+        </div>
+      </div>
+      <div class="step-actions">
+        <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
+        <div class="right">
+          <button class="btn btn-primary" id="btn-next-2">Save & Continue →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Project Basics -->
+    <div class="step" data-step="3">
+      <h2 class="step-title">Project basics</h2>
+      <p class="step-desc">Tell us about the content you want to create.</p>
+      <div class="panel">
+        <div class="form-group">
+          <label>Project name</label>
+          <input type="text" id="project-name" placeholder="My Content Studio" value="My Content Studio">
+        </div>
+        <div class="form-group">
+          <label>Target audience</label>
+          <input type="text" id="target-audience" placeholder="General audience interested in educational content" value="General audience interested in educational content">
+        </div>
+        <div class="form-group">
+          <label>Content generation frequency</label>
+          <select id="posting-frequency">
+            <option value="daily">Daily</option>
+            <option value="every-2-days">Every other day</option>
+            <option value="3-per-week">3 times per week</option>
+            <option value="weekly" selected>Weekly</option>
+          </select>
+        </div>
+      </div>
+      <div class="step-actions">
+        <button class="btn btn-secondary" onclick="goStep(2)">← Back</button>
+        <div class="right">
+          <button class="btn btn-primary" id="btn-next-3">Save & Finish →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Summary -->
+    <div class="step" data-step="4">
+      <h2 class="step-title">You're all set! 🎉</h2>
+      <p class="step-desc">Here's what your content pipeline can do.</p>
+      <div class="summary-grid" id="summary-grid"></div>
+      <div class="panel" style="text-align:center;padding:20px;">
+        <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:8px;">Generated content will be saved to:</p>
+        <code style="color:var(--accent);font-size:0.95rem;" id="output-path">output/</code>
+      </div>
+      <div class="launch-section">
+        <a href="/" class="btn btn-primary">🚀 Launch Content Studio</a>
+        <p>Or close this tab and run <code>npm start</code></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    let currentStep = 0, selectedAI = null, aiKeyVerified = false, selectedVideo = 'slideshow';
+
+    const AI_PROVIDERS = {
+      gemini:     { name: 'Google Gemini', desc: 'Free text & TTS tiers; paid AI images', free: true, hint: 'Starts with "AIza"', keyUrl: 'https://aistudio.google.com/apikey', models: ['gemini-3.7-flash','gemini-3.1-pro-preview','gemini-3.5-flash-lite'], default: 'gemini-3.7-flash' },
+      openai:     { name: 'OpenAI', desc: 'GPT-5.6 text, DALL-E images, TTS voice', free: false, hint: 'Starts with "sk-"', keyUrl: 'https://platform.openai.com/api-keys', models: ['gpt-5.6','gpt-5.6-terra','gpt-5.6-luna'], default: 'gpt-5.6' },
+      openrouter: { name: 'OpenRouter', desc: 'One key, 400+ models (pay per use)', free: false, hint: 'Starts with "sk-or-"', keyUrl: 'https://openrouter.ai/keys', models: ['google/gemini-3.7-flash','openai/gpt-5.6-sol','anthropic/claude-fable-5','moonshotai/kimi-k3'], default: 'google/gemini-3.7-flash' },
+      kimi:       { name: 'Kimi (Moonshot AI)', desc: 'K3 and K2 family text models', free: false, hint: 'From platform.kimi.ai', keyUrl: 'https://platform.kimi.ai', models: ['kimi-k3','kimi-k2.7-code','kimi-k2.6'], default: 'kimi-k3' },
+      mimo:       { name: 'MiMo (Xiaomi)', desc: 'Competitive pricing text models', free: false, hint: 'From mimo.mi.com', keyUrl: 'https://mimo.mi.com', models: ['mimo-v2.5-pro','mimo-v2.5'], default: 'mimo-v2.5-pro' },
+      glm:        { name: 'GLM (Zhipu AI)', desc: 'GLM-5 family text models', free: false, hint: 'From z.ai', keyUrl: 'https://z.ai', models: ['glm-5.3','glm-5.2','glm-5.1'], default: 'glm-5.3' }
+    };
+
+    const VIDEO_PROVIDERS = {
+      slideshow:   { name: 'Local slideshow', desc: 'Free — FFmpeg assembly from stills + narration', free: true, needsKey: false },
+      seedance:    { name: 'Seedance 2.5', desc: 'ByteDance — cinematic 30s scenes', free: false, needsKey: true, keyLabel: 'Replicate API token', keyUrl: 'https://replicate.com/account/api-tokens' },
+      minimax_h3:  { name: 'MiniMax H3', desc: 'Multimodal native-audio video', free: false, needsKey: true, keyLabel: 'MiniMax API key', keyUrl: 'https://platform.minimax.io' },
+      google_omni: { name: 'Gemini Omni Flash', desc: 'Google — fast video generation', free: false, needsKey: true, keyLabel: 'Gemini API key', keyUrl: 'https://aistudio.google.com/apikey' },
+      kling:       { name: 'Kling 3.0', desc: 'Kuaishou — storyboards & characters', free: false, needsKey: true, keyLabel: 'Kling access key', secretLabel: 'Kling secret key', keyUrl: 'https://kling.ai/global/dev' },
+      wan:         { name: 'Wan 2.7', desc: 'Alibaba — efficient multimodal workflows', free: false, needsKey: true, keyLabel: 'DashScope API key', keyUrl: 'https://modelstudio.console.alibabacloud.com/' }
+    };
+
+    function goStep(n) {
+      currentStep = n;
+      document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+      document.querySelector('.step[data-step="'+n+'"]').classList.add('active');
+      document.querySelectorAll('.progress-step').forEach(el => {
+        const s = +el.dataset.step;
+        el.classList.toggle('active', s === n);
+        el.classList.toggle('done', s < n);
+      });
+      document.querySelectorAll('.progress-label').forEach(el => {
+        const s = +el.dataset.step;
+        el.classList.toggle('active', s === n);
+        el.classList.toggle('done', s < n);
+      });
+      if (n === 0) runSystemChecks();
+      if (n === 4) loadSummary();
+    }
+
+    async function runSystemChecks() {
+      const btn = document.getElementById('btn-next-0');
+      btn.disabled = true;
+      try {
+        const res = await fetch(API + '/api/walkthrough/system-check');
+        const data = await res.json();
+        document.getElementById('system-checks').innerHTML = data.checks.map(c =>
+          '<li><span class="check-icon '+(c.ok?'ok':'warn')+'">'+(c.ok?'✓':'!')+'</span><span>'+c.name+(c.ok?'':' — <em style="color:var(--warning)">'+(c.hint||'')+'</em>')+'</span></li>'
+        ).join('');
+        btn.disabled = false;
+      } catch (e) {
+        document.getElementById('system-checks').innerHTML = '<li><span class="check-icon warn">!</span><span>Failed to connect: '+e.message+'</span></li>';
+      }
+    }
+
+    function buildAIProviders() {
+      document.getElementById('ai-providers').innerHTML = Object.entries(AI_PROVIDERS).map(([id, p]) =>
+        '<div class="provider-card" data-provider="'+id+'" onclick="selectAI(\''+id+'\')"><h4>'+p.name+(p.free?'<span class="badge-free">FREE TIER</span>':'')+'</h4><small>'+p.desc+'</small></div>'
+      ).join('');
+    }
+
+    function selectAI(id) {
+      selectedAI = id; aiKeyVerified = false;
+      document.querySelectorAll('#ai-providers .provider-card').forEach(c => c.classList.toggle('selected', c.dataset.provider === id));
+      const p = AI_PROVIDERS[id], panel = document.getElementById('ai-key-panel');
+      panel.style.display = 'block';
+      document.getElementById('ai-key-label').textContent = p.name + ' API Key';
+      document.getElementById('ai-key-hint').innerHTML = p.hint + ' — <a href="'+p.keyUrl+'" target="_blank">Get your key →</a>';
+      document.getElementById('ai-key-input').value = '';
+      document.getElementById('ai-model-select').innerHTML = p.models.map(m => '<option value="'+m+'"'+(m===p.default?' selected':'')+'>'+m+'</option>').join('');
+      document.getElementById('btn-test-key').disabled = false;
+      document.getElementById('btn-next-1').disabled = true;
+      hideStatus('ai-key-status');
+    }
+
+    document.getElementById('ai-key-input').addEventListener('input', function() {
+      document.getElementById('btn-test-key').disabled = !this.value.trim();
+      document.getElementById('btn-next-1').disabled = true;
+      aiKeyVerified = false; hideStatus('ai-key-status');
+    });
+
+    document.getElementById('btn-test-key').addEventListener('click', async function() {
+      var key = document.getElementById('ai-key-input').value.trim();
+      var model = document.getElementById('ai-model-select').value;
+      if (!key || !selectedAI) return;
+      this.disabled = true; this.innerHTML = '<span class="spinner"></span> Testing…';
+      showStatus('ai-key-status', 'info', 'Testing your key with a quick request…');
+      try {
+        var res = await fetch(API + '/api/walkthrough/test-key', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: selectedAI, apiKey: key, model: model })
+        });
+        var data = await res.json();
+        if (data.success) {
+          showStatus('ai-key-status', 'success', '✓ Key works! You can save and continue.');
+          aiKeyVerified = true; document.getElementById('btn-next-1').disabled = false;
+        } else {
+          showStatus('ai-key-status', 'error', '✗ ' + (data.error || 'Key validation failed'));
+        }
+      } catch (e) { showStatus('ai-key-status', 'error', '✗ Connection error: ' + e.message); }
+      this.disabled = false; this.innerHTML = 'Test key';
+    });
+
+    document.getElementById('btn-next-1').addEventListener('click', async function() {
+      if (!selectedAI || !aiKeyVerified) return;
+      try {
+        await fetch(API + '/api/walkthrough/save-ai-provider', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: selectedAI, apiKey: document.getElementById('ai-key-input').value.trim(), model: document.getElementById('ai-model-select').value })
+        });
+        goStep(2);
+      } catch (e) { showStatus('ai-key-status', 'error', 'Failed to save: ' + e.message); }
+    });
+
+    function buildVideoProviders() {
+      document.getElementById('video-providers').innerHTML = Object.entries(VIDEO_PROVIDERS).map(([id, p]) =>
+        '<div class="provider-card'+(id==='slideshow'?' selected':'')+'" data-provider="'+id+'" onclick="selectVideo(\''+id+'\')"><h4>'+p.name+(p.free?'<span class="badge-free">FREE</span>':'')+'</h4><small>'+p.desc+'</small></div>'
+      ).join('');
+    }
+
+    function selectVideo(id) {
+      selectedVideo = id;
+      document.querySelectorAll('#video-providers .provider-card').forEach(c => c.classList.toggle('selected', c.dataset.provider === id));
+      var p = VIDEO_PROVIDERS[id], panel = document.getElementById('video-key-panel');
+      if (p.needsKey) {
+        panel.style.display = 'block';
+        document.getElementById('video-key-label').textContent = p.keyLabel;
+        document.getElementById('video-key-hint').innerHTML = '<a href="'+p.keyUrl+'" target="_blank">Get your key →</a>';
+        document.getElementById('video-key-input').value = '';
+        var sg = document.getElementById('video-secret-group');
+        if (p.secretLabel) { sg.style.display = 'block'; document.getElementById('video-secret-label').textContent = p.secretLabel; }
+        else { sg.style.display = 'none'; }
+      } else { panel.style.display = 'none'; }
+    }
+
+    document.getElementById('btn-next-2').addEventListener('click', async function() {
+      try {
+        await fetch(API + '/api/walkthrough/save-video-provider', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: selectedVideo, apiKey: document.getElementById('video-key-input').value.trim() || null, secretKey: document.getElementById('video-secret-input').value.trim() || null })
+        });
+      } catch (e) { console.error(e); }
+      goStep(3);
+    });
+
+    document.getElementById('btn-next-3').addEventListener('click', async function() {
+      try {
+        await fetch(API + '/api/walkthrough/save-project', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channelName: document.getElementById('project-name').value.trim() || 'My Content Studio',
+            targetAudience: document.getElementById('target-audience').value.trim() || 'General audience',
+            postingFrequency: document.getElementById('posting-frequency').value
+          })
+        });
+      } catch (e) { console.error(e); }
+      goStep(4);
+    });
+
+    async function loadSummary() {
+      try {
+        var res = await fetch(API + '/api/walkthrough/summary');
+        var data = await res.json();
+        document.getElementById('summary-grid').innerHTML = data.capabilities.map(function(c) {
+          return '<div class="summary-card"><p class="label">'+c.name+'</p><p class="value '+(c.ok?'ok':'miss')+'">'+(c.ok?'✓ Ready':'✗ Not configured')+'</p></div>';
+        }).join('');
+        if (data.outputPath) document.getElementById('output-path').textContent = data.outputPath;
+      } catch (e) { document.getElementById('summary-grid').innerHTML = '<p style="color:var(--error)">Failed to load summary</p>'; }
+    }
+
+    function showStatus(id, type, msg) { var el = document.getElementById(id); el.className = 'status-msg show ' + type; el.textContent = msg; }
+    function hideStatus(id) { document.getElementById(id).className = 'status-msg'; }
+
+    buildAIProviders(); buildVideoProviders(); runSystemChecks();
+  </script>
+</body>
+</html>

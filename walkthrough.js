@@ -151,7 +151,7 @@ const VIDEO_PROVIDER_GUIDE = {
 class SetupWalkthrough {
   constructor() {
     this.cm = new CredentialManager();
-    this.totalSteps = 6;
+    this.totalSteps = 4; // Reduced from 6 — YouTube step removed
   }
 
   header(step, title) {
@@ -171,9 +171,9 @@ class SetupWalkthrough {
   }
 
   async run() {
-    console.log(chalk.cyan.bold('\n🧭 YouTube Automation Agent — Guided Walkthrough'));
+    console.log(chalk.cyan.bold('\n🧭 Lumen Content Studio — Guided Walkthrough'));
     console.log(chalk.gray('═'.repeat(60)));
-    console.log(chalk.white('This takes about 10–15 minutes and explains everything as you go.'));
+    console.log(chalk.white('This takes about 5 minutes and explains everything as you go.'));
     console.log(chalk.white('Every step can be skipped and finished later — your progress is'));
     console.log(chalk.white('saved after each step. Re-run any time with: ') + chalk.cyan('npm run walkthrough'));
 
@@ -184,7 +184,8 @@ class SetupWalkthrough {
       await this.stepSystemCheck();
       await this.stepAIProvider();
       await this.stepVideoProvider();
-      await this.stepYouTube();
+      // YouTube step removed — content-only mode
+      // await this.stepYouTube();
       await this.stepChannelBasics();
       await this.stepFinish();
     } catch (error) {
@@ -477,22 +478,22 @@ class SetupWalkthrough {
     }
   }
 
-  // ── Step 5: channel basics ─────────────────────────────────────────────
+  // ── Step 4: channel basics ─────────────────────────────────────────────
   async stepChannelBasics() {
-    this.header(5, 'Channel & content basics');
+    this.header(4, 'Content & project basics');
 
     const existing = this.cm.credentials.channel || {};
     const answers = await inquirer.prompt([
       {
         type: 'input',
         name: 'channelName',
-        message: 'What\'s your channel called?',
-        default: existing.channelName || 'My Automated Channel'
+        message: 'What\'s your project called?',
+        default: existing.channelName || 'My Content Studio'
       },
       {
         type: 'list',
         name: 'postingFrequency',
-        message: 'How often should it post?',
+        message: 'How often should it generate content?',
         choices: [
           { name: 'Daily', value: 'daily' },
           { name: 'Every other day', value: 'every-2-days' },
@@ -525,13 +526,12 @@ class SetupWalkthrough {
     };
     await this.cm.saveCredentials();
 
-    console.log(chalk.green('  ✓ Saved.') + chalk.gray(' Uploads default to PRIVATE so you can review them first —'));
-    console.log(chalk.gray('  set DEFAULT_PRIVACY_STATUS=public in .env when you\'re confident.'));
+    console.log(chalk.green('  ✓ Saved.') + chalk.gray(' Generated content is saved to the output/ folder.'));
   }
 
-  // ── Step 6: summary ────────────────────────────────────────────────────
+  // ── Final: summary ─────────────────────────────────────────────────────
   async stepFinish() {
-    this.header(6, 'All set — here\'s what your pipeline can do');
+    console.log(chalk.cyan.bold('\n━━━ All set — here\'s what your pipeline can do '.padEnd(62, '━')));
 
     await this.cm.loadCredentials();
     await this.cm.loadTokens();
@@ -549,8 +549,8 @@ class SetupWalkthrough {
       { ok: hasText, name: 'Write scripts & pick topics', fix: 'step 2 (AI provider)' },
       { ok: hasMedia, name: 'Generate images & voice narration', fix: 'step 2 — use a Gemini or OpenAI key' },
       { ok: hasFFmpeg, name: 'Assemble real .mp4 videos', fix: ffmpegInstallHint() },
-      { ok: hasVideoProvider, name: 'Generate AI video clips', fix: 'step 3 — or keep the local slideshow provider' },
-      { ok: hasUpload, name: 'Upload to YouTube', fix: 'step 4 (YouTube connection)' }
+      { ok: hasVideoProvider, name: 'Generate AI video clips', fix: 'step 3 — or keep the local slideshow provider' }
+      // YouTube upload removed — content-only mode
     ];
 
     for (const row of rows) {
@@ -562,8 +562,7 @@ class SetupWalkthrough {
     console.log(chalk.cyan.bold('\n🚀 Next steps:'));
     console.log(chalk.white('  1. npm start'));
     console.log(chalk.white('  2. Open http://localhost:3456 and press "Generate Content"'));
-    console.log(chalk.white('     (or wait — it generates automatically every day at 6 AM)'));
-    console.log(chalk.white('  3. Finished videos land in data/videos/ and upload as PRIVATE'));
+    console.log(chalk.white('  3. Finished content lands in the output/ folder (scripts, thumbnails, videos, metadata)'));
     console.log(chalk.gray('\nChanged your mind about anything? Just run: npm run walkthrough'));
   }
 }
