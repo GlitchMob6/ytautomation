@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>System Readiness — Preflight</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #06080c; --surface: rgba(255,255,255,0.04); --surface-hover: rgba(255,255,255,0.07);
+      --border: rgba(255,255,255,0.08); --text: #e8eaed; --text-dim: #9aa0a6;
+      --text-faint: #5f6368; --accent: #7c6aff; --success: #34d399; --warning: #fbbf24;
+      --error: #f87171; --radius: 12px; --radius-sm: 8px;
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); padding: 40px 24px; max-width: 1000px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 40px; }
+    .header h1 { font-size: 2rem; font-weight: 800; }
+    .header p { color: var(--text-dim); margin-top: 8px; }
+    
+    .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+    .panel h2 { font-size: 1.2rem; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
+    
+    .category-group { margin-bottom: 24px; }
+    .category-title { font-size: 0.9rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+    
+    .req-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; }
+    .req-info { display: flex; align-items: flex-start; gap: 12px; flex: 1; }
+    .req-icon { font-size: 1.2rem; line-height: 1; }
+    .req-text h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+    .req-text p { font-size: 0.8rem; color: var(--text-dim); line-height: 1.4; }
+    .req-actions { display: flex; gap: 8px; margin-left: 16px; }
+    
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+    .badge.ready { background: rgba(52,211,153,0.15); color: var(--success); }
+    .badge.warning { background: rgba(251,191,36,0.15); color: var(--warning); }
+    .badge.failed { background: rgba(248,113,113,0.15); color: var(--error); }
+    .badge.bypassed { background: rgba(154,160,166,0.15); color: var(--text-dim); }
+    .badge.checking { background: rgba(124,106,255,0.15); color: var(--accent); }
+    
+    .cap-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .cap-item:last-child { border-bottom: none; }
+    
+    .btn { padding: 8px 12px; border: none; border-radius: 6px; font-family: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #6b59e8; }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--surface-hover); }
+    .btn-danger { background: rgba(248,113,113,0.15); color: var(--error); border: 1px solid rgba(248,113,113,0.3); }
+    .btn-danger:hover { background: rgba(248,113,113,0.25); }
+    
+    .log-panel { font-family: monospace; font-size: 0.8rem; background: #000; padding: 16px; border-radius: var(--radius-sm); max-height: 200px; overflow-y: auto; color: var(--text-dim); border: 1px solid var(--border); }
+    .log-line { margin-bottom: 4px; }
+    
+    .status-banner { padding: 16px; border-radius: var(--radius-sm); margin-bottom: 24px; text-align: center; font-weight: 600; font-size: 1.1rem; }
+    .status-banner.ready { background: rgba(52,211,153,0.1); color: var(--success); border: 1px solid rgba(52,211,153,0.2); }
+    .status-banner.not-ready { background: rgba(248,113,113,0.1); color: var(--error); border: 1px solid rgba(248,113,113,0.2); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>System Readiness</h1>
+    <p>Preflight Environment & Capabilities Check</p>
+  </div>
+
+  <div id="status-banner" class="status-banner" style="display:none;"></div>
+
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <h2>Requirements Check</h2>
+        <div id="requirements-container">
+          <p style="color:var(--text-dim);text-align:center;">Running checks...</p>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <h2>Preflight Logs</h2>
+        <div class="log-panel" id="log-container">
+          <div class="log-line">Starting system checks...</div>
+        </div>
+      </div>
+    </div>
+    
+    <div>
+      <div class="panel">
+        <h2>Pipeline Capabilities</h2>
+        <div id="capabilities-container">
+          <p style="color:var(--text-dim);">Loading...</p>
+        </div>
+      </div>
+      
+      <div class="panel" style="text-align: center;">
+        <button id="btn-start" class="btn btn-primary" style="width:100%; padding:12px; font-size: 1rem; margin-bottom: 12px;" disabled>Continue to App →</button>
+        <button id="btn-recheck" class="btn btn-secondary" style="width:100%;">Re-run Checks</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const logContainer = document.getElementById('log-container');
+    const reqContainer = document.getElementById('requirements-container');
+    const capContainer = document.getElementById('capabilities-container');
+    const statusBanner = document.getElementById('status-banner');
+    const btnStart = document.getElementById('btn-start');
+    const btnRecheck = document.getElementById('btn-recheck');
+
+    function addLog(msg) {
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      const time = new Date().toLocaleTimeString();
+      line.innerText = `[${time}] ${msg}`;
+      logContainer.appendChild(line);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function getStatusIcon(status) {
+      if (status === 'READY') return '✅';
+      if (status === 'WARNING') return '⚠️';
+      if (status === 'FAILED' || status === 'MISSING') return '❌';
+      if (status === 'BYPASSED') return '⏭️';
+      if (status === 'CHECKING') return '⏳';
+      return '❓';
+    }
+
+    async function bypassRequirement(id, name) {
+      if (!confirm(`Are you sure you want to bypass ${name}? Some capabilities will be unavailable.`)) return;
+      addLog(`User bypassing requirement: ${id}`);
+      try {
+        const res = await fetch('/api/preflight/bypass', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (data.success) {
+          addLog(`${id} bypassed successfully.`);
+          loadStatus();
+        } else {
+          addLog(`Bypass failed: ${data.error}`);
+          alert(`Bypass failed: ${data.error}`);
+        }
+      } catch (e) {
+        addLog(`Error bypassing: ${e.message}`);
+      }
+    }
+
+    async function installRequirement(id, name) {
+      addLog(`Initiating install for ${name}...`);
+      try {
+        const res = await fetch('/api/preflight/install', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (data.success) {
+          addLog(`Install started for ${id}`);
+          // Polling would normally go here
+          loadStatus();
+        } else {
+          addLog(`Install error: ${data.error}`);
+          alert(`Install action: ${data.error}`);
+        }
+      } catch (e) {
+        addLog(`Error installing: ${e.message}`);
+      }
+    }
+
+    function renderRequirements(requirements) {
+      reqContainer.innerHTML = '';
+      
+      // Group by category
+      const categories = {};
+      requirements.forEach(req => {
+        if (!categories[req.category]) categories[req.category] = [];
+        categories[req.category].push(req);
+      });
+
+      for (const [category, reqs] of Object.entries(categories)) {
+        const group = document.createElement('div');
+        group.className = 'category-group';
+        group.innerHTML = `<div class="category-title">${category}</div>`;
+        
+        reqs.forEach(req => {
+          const item = document.createElement('div');
+          item.className = 'req-item';
+          
+          let actionButtons = '';
+          if (req.status === 'FAILED' || req.status === 'MISSING') {
+            actionButtons += `<button class="btn btn-primary" onclick="installRequirement('${req.id}', '${req.name.replace(/'/g, "\\'")}')">Install / Fix</button>`;
+            if (req.bypassAllowed) {
+              actionButtons += `<button class="btn btn-danger" onclick="bypassRequirement('${req.id}', '${req.name.replace(/'/g, "\\'")}')">Bypass</button>`;
+            }
+          }
+
+          item.innerHTML = `
+            <div class="req-info">
+              <div class="req-icon">${getStatusIcon(req.status)}</div>
+              <div class="req-text">
+                <h4>${req.name} <span class="badge ${req.status.toLowerCase()}">${req.status}</span></h4>
+                <p>${req.details || req.description}</p>
+                ${req.severity === 'HARD_BLOCKER' ? '<p style="color:var(--error);font-size:0.75rem;margin-top:4px;">HARD BLOCKER</p>' : ''}
+              </div>
+            </div>
+            <div class="req-actions">
+              ${actionButtons}
+            </div>
+          `;
+          group.appendChild(item);
+        });
+        
+        reqContainer.appendChild(group);
+      }
+    }
+
+    function renderCapabilities(capabilities, overallReady) {
+      capContainer.innerHTML = '';
+      let readyCount = 0;
+      const keys = Object.keys(capabilities);
+      
+      keys.forEach(cap => {
+        const isReady = capabilities[cap];
+        if (isReady) readyCount++;
+        
+        const el = document.createElement('div');
+        el.className = 'cap-item';
+        el.innerHTML = `
+          <span>${cap.replace(/_/g, ' ')}</span>
+          <span style="color: ${isReady ? 'var(--success)' : 'var(--error)'}; font-weight: bold;">
+            ${isReady ? 'READY' : 'UNAVAILABLE'}
+          </span>
+        `;
+        capContainer.appendChild(el);
+      });
+
+      statusBanner.style.display = 'block';
+      if (overallReady) {
+        statusBanner.className = 'status-banner ready';
+        statusBanner.innerHTML = `CORE PIPELINE READY (${readyCount}/${keys.length} Capabilities)`;
+        btnStart.disabled = false;
+        btnStart.onclick = () => window.location.href = '/';
+      } else {
+        statusBanner.className = 'status-banner not-ready';
+        statusBanner.innerHTML = `PIPELINE BLOCKED — MISSING HARD BLOCKERS`;
+        btnStart.disabled = true;
+      }
+    }
+
+    async function loadStatus() {
+      addLog('Fetching system status...');
+      try {
+        const res = await fetch('/api/preflight/status');
+        const data = await res.json();
+        
+        if (data.success) {
+          renderRequirements(data.requirements);
+          renderCapabilities(data.capabilities, data.overallReady);
+          addLog('Status fetch complete.');
+        } else {
+          addLog(`Error fetching status: ${data.error}`);
+        }
+      } catch (e) {
+        addLog(`Network error: ${e.message}`);
+      }
+    }
+
+    btnRecheck.onclick = () => loadStatus();
+    
+    // Initial load
+    loadStatus();
+  </script>
+</body>
+</html>

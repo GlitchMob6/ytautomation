@@ -24,6 +24,7 @@ const { SceneRepairService } = require('./utils/scene-repair-service');
 const { AITextService } = require('./utils/ai-text-service');
 const { DiscoverabilityService } = require('./utils/discoverability-service');
 const { mountWalkthroughAPI } = require('./walkthrough-api');
+const { mountPreflightAPI } = require('./preflight-api');
 const { version } = require('./package.json');
 const chalk = require('chalk');
 
@@ -345,6 +346,9 @@ class ContentGeneratorAgent {
     
     // Mount walkthrough GUI API
     mountWalkthroughAPI(this.app);
+    
+    // Mount preflight API
+    mountPreflightAPI(this.app, this.logger);
 
     if (!process.env.API_KEY) {
       this.logger.warn('API_KEY is not set; mutating API routes are unprotected');

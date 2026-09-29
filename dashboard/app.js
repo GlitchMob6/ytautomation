@@ -91,6 +91,30 @@ function statusChip(value) {
   return `<span class="status ${escapeHTML(safe)}">${escapeHTML(label(safe))}</span>`;
 }
 
+function renderFriendlyError(errorText, context = 'A process') {
+  if (!errorText) return '';
+  const safeText = escapeHTML(String(errorText));
+  const encoded = encodeURIComponent(String(errorText));
+  const copyJs = `navigator.clipboard.writeText('Please fix this error in Lumen Content Studio: ' + decodeURIComponent('${encoded}')); showToast('Error copied! Paste it to your Antigravity AI assistant to fix it.', 'success');`;
+  
+  return `<div style="background: rgba(255, 77, 94, 0.1); border-left: 4px solid #ff4d5e; padding: 12px 16px; margin: 12px 0; border-radius: 4px;">
+    <h4 style="margin: 0 0 4px 0; color: #ff4d5e; display: flex; align-items: center; gap: 8px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+      Technical Issue Detected
+    </h4>
+    <p style="margin: 0 0 12px 0; font-size: 13px; color: rgba(255,255,255,0.8);">
+      ${context} encountered an unexpected issue. Don't worry—you don't need to troubleshoot this yourself. Hand it over to the AI assistant to resolve.
+    </p>
+    <details style="margin-bottom: 12px; font-size: 11px; opacity: 0.6;">
+      <summary style="cursor: pointer;">Show technical details</summary>
+      <div style="padding: 8px; background: rgba(0,0,0,0.2); margin-top: 4px; border-radius: 4px; white-space: pre-wrap; font-family: monospace;">${safeText}</div>
+    </details>
+    <button type="button" class="button secondary small" onclick="${copyJs}" style="border-color: #ff4d5e; color: #ff4d5e;">
+      Copy error for AI assistant
+    </button>
+  </div>`;
+}
+
 async function refreshDashboard(silent = false) {
   if (ui.refreshing) return;
   ui.refreshing = true;
@@ -737,7 +761,7 @@ function renderOperator(strategy, runs, system) {
     <div class="run-summary-row"><span>Research</span><strong>${escapeHTML(sources)}</strong></div>
     <div class="run-summary-row"><span>Produced</span><strong>${escapeHTML(run.summary?.generated || 0)} / ${escapeHTML(run.summary?.planned || run.plan?.length || 0)}</strong></div>
     <div class="run-summary-row"><span>Needs review</span><strong>${escapeHTML(run.summary?.needsReview || 0)}</strong></div>
-    ${run.error ? `<p class="callout">${escapeHTML(run.error)}</p>` : ''}
+    ${run.error ? renderFriendlyError(run.error, 'The generation job') : ''}
   </div>`;
   const plan = Array.isArray(run.plan) ? run.plan : [];
   $('#operator-plan').innerHTML = plan.length ? plan.map((item, index) => {
@@ -874,7 +898,7 @@ function renderDiscoverabilityPanel(item) {
       <div><p class="eyebrow">DISCOVERABILITY PREFLIGHT</p><h3>DarkzSEO review</h3><p>Review GEO, AIO, AEO, and web-search guidance against this content package. Findings are advisory and never rewrite or publish content.</p></div>
       <div class="discoverability-actions"><span class="status ${stateClass}">${escapeHTML(state)}</span><button type="button" class="button secondary small" data-discoverability-run="${escapeHTML(item.id)}">${audit ? 'Run again' : 'Run audit'}</button></div>
     </div>
-    ${audit?.error ? `<p class="callout">DarkzSEO could not run${audit.errorCode || audit.error_code ? ` (${escapeHTML(audit.errorCode || audit.error_code)})` : ''}: ${escapeHTML(audit.error)}</p>` : ''}
+    ${audit?.error ? renderFriendlyError(audit.error, 'The SEO audit') : ''}
     ${findings.length ? `<div class="discoverability-findings">${findings.map(finding => {
       const reviewStatus = finding.reviewStatus || finding.review_status || 'pending';
       return `<article class="discoverability-finding severity-${escapeHTML(String(finding.severity || 'info').toLowerCase())}" data-discoverability-finding="${escapeHTML(finding.id)}">
@@ -934,7 +958,8 @@ function renderSceneEditor(item, canReview = true) {
             <label class="toggle"><input type="checkbox" data-scene-factual checked ${disabled ? 'disabled' : ''}><span></span> Narration changes may contain factual claims</label>
             <span>Visual: ${escapeHTML(scene.provider || 'local')} ${scene.model ? `· ${escapeHTML(scene.model)}` : ''}</span>
           </div>
-          <div class="scene-narration-evidence"><span>Narration: ${escapeHTML(scene.narrationProvider || 'not generated')}${scene.narrationModel ? ` · ${escapeHTML(scene.narrationModel)}` : ''}${scene.narrationTaskId ? ` · task ${escapeHTML(scene.narrationTaskId)}` : ''}</span>${scene.narrationError ? `<span class="danger-text">${escapeHTML(scene.narrationError)}</span>` : ''}</div>
+          <div class="scene-narration-evidence"><span>Narration: ${escapeHTML(scene.narrationProvider || 'not generated')}${scene.narrationModel ? ` · ${escapeHTML(scene.narrationModel)}` : ''}${scene.narrationTaskId ? ` · task ${escapeHTML(scene.narrationTaskId)}` : ''}</span></div>
+          ${scene.narrationError ? renderFriendlyError(scene.narrationError, 'Narration generation') : ''}
           ${canReview ? `<div class="scene-actions">
             <button type="button" class="text-button" data-scene-move="up" ${disabled || index === 0 ? 'disabled' : ''}>↑ Earlier</button>
             <button type="button" class="text-button" data-scene-move="down" ${disabled || index === scenes.length - 1 ? 'disabled' : ''}>↓ Later</button>
@@ -981,7 +1006,8 @@ function renderShortsStudio(item) {
             <label><span>Publish time</span><input data-short-field="publishTime" type="datetime-local" value="${toLocalInput(clip.publishTime)}" ${locked ? 'disabled' : ''}></label>
             <label><span>Privacy</span><select data-short-field="privacyStatus" ${locked ? 'disabled' : ''}><option value="private" ${clip.privacyStatus === 'private' ? 'selected' : ''}>Private</option><option value="unlisted" ${clip.privacyStatus === 'unlisted' ? 'selected' : ''}>Unlisted</option><option value="public" ${clip.privacyStatus === 'public' ? 'selected' : ''}>Public</option></select></label>
           </div>
-          <p class="short-rationale">${escapeHTML(clip.rationale || '')}${clip.error ? `<br><span class="danger-text">${escapeHTML(clip.error)}</span>` : ''}</p>
+          <p class="short-rationale">${escapeHTML(clip.rationale || '')}</p>
+          ${clip.error ? renderFriendlyError(clip.error, 'Short generation') : ''}
           ${clip.youtubeUrl ? `<a class="source-link" href="${escapeHTML(clip.youtubeUrl)}" target="_blank" rel="noopener">Open published Short ↗</a>` : ''}
           ${!locked ? `<div class="short-actions"><button type="button" class="text-button" data-short-save>Save draft</button><button type="button" class="button secondary small" data-short-render>${rendered ? 'Render again' : 'Render 9:16'}</button><button type="button" class="button primary small" data-short-approve ${!parentApproved || clip.status !== 'rendered' ? 'disabled' : ''} title="${!parentApproved ? 'Approve the source production first' : clip.status !== 'rendered' ? 'Render this Short first' : 'Confirm and schedule this Short'}">Approve &amp; schedule</button></div>` : ''}
         </div>

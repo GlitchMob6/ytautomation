@@ -16,44 +16,10 @@ class AIVideoGenerator {
     this.lastVideoResult = null;
     this.lastNarrationResult = null;
     
-    // Initialize AI services with graceful fallback
-    const openaiKey = resolvedCredentials.openai?.apiKey || process.env.OPENAI_API_KEY;
-    const replicateKey = resolvedCredentials.replicate?.apiKey || process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_KEY;
-    
-    if (openaiKey) {
-      this.openai = new OpenAI({ apiKey: openaiKey });
-      this.logger.info('OpenAI service initialized');
-    } else {
-      this.logger.warn('OpenAI API key not found - AI features will be simulated');
-    }
-    
-    if (replicateKey) {
-      this.replicate = new Replicate({ auth: replicateKey });
-      this.logger.info('Replicate service initialized');
-    } else {
-      this.logger.warn('Replicate API key not found - advanced video generation unavailable');
-    }
+    const { createProviderRouter } = require('./providers/index');
+    this.router = createProviderRouter(resolvedCredentials, this.logger);
 
-    // Gemini media generation (images + native TTS) — free-tier alternative to OpenAI
-    const geminiKey = resolvedCredentials.gemini?.apiKey || process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      try {
-        const { GoogleGenAI } = require('@google/genai');
-        this.gemini = new GoogleGenAI({ apiKey: geminiKey });
-        this.logger.info('Gemini media service initialized (images + TTS)');
-      } catch (error) {
-        this.logger.warn('Failed to initialize Gemini media service:', error.message);
-      }
-    }
-    
-    // ElevenLabs configuration
-    this.elevenLabsApiKey = resolvedCredentials.elevenLabs?.apiKey || process.env.ELEVENLABS_API_KEY;
-    this.elevenLabsVoiceId = resolvedCredentials.elevenLabs?.voiceId || process.env.ELEVENLABS_VOICE_ID;
-    this.elevenLabsModel = process.env.ELEVENLABS_TTS_MODEL || 'eleven_v3';
-    
-    // Azure Speech configuration
-    this.azureSpeechKey = resolvedCredentials.azure?.speechKey || process.env.AZURE_SPEECH_KEY;
-    this.azureSpeechRegion = resolvedCredentials.azure?.speechRegion || process.env.AZURE_SPEECH_REGION;
+    // Keep legacy mediaGeneration for video clip assembly
     this.mediaGeneration = options.mediaGeneration || (this.db
       ? new MediaGenerationService(this.db, resolvedCredentials, { logger: this.logger })
       : null);
@@ -62,44 +28,27 @@ class AIVideoGenerator {
   async generateTTSAudio(text, outputPath) {
     this.logger.info('Generating TTS audio...');
     this.lastNarrationResult = null;
-    let provider = 'simulation';
-    let model = null;
-
+    
     try {
-      let generatedPath;
-      if (this.elevenLabsApiKey && this.elevenLabsVoiceId) {
-        provider = 'elevenlabs';
-        model = this.elevenLabsModel;
-        generatedPath = await this.generateElevenLabsTTS(text, outputPath);
-      } else if (this.openai) {
-        provider = 'openai';
-        model = 'gpt-4o-mini-tts';
-        generatedPath = await this.generateOpenAITTS(text, outputPath);
-      } else if (this.gemini) {
-        provider = 'gemini';
-        model = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview';
-        generatedPath = await this.generateGeminiTTS(text, outputPath);
-      } else {
-        generatedPath = await this.simulateTTSGeneration(text, outputPath);
-      }
-
-      const usable = await this.isUsableAudioFile(generatedPath);
+      const result = await this.router.generateSpeech({ text, outputPath });
+      const usable = await this.isUsableAudioFile(result.path);
+      
       this.lastNarrationResult = {
         status: usable ? 'ready' : 'unavailable',
-        path: generatedPath,
-        provider,
-        model,
+        path: result.path,
+        provider: result.provider,
+        model: result.model || 'default',
         externalTaskId: null,
         generatedAt: new Date().toISOString(),
-        simulated: !usable,
-        cost: { provider, amount: null, currency: null, invoiceRequired: provider !== 'simulation' }
+        simulated: !usable, // Should be false unless file is missing/empty
+        cost: { provider: result.provider, amount: null, currency: null, invoiceRequired: true }
       };
-      return generatedPath;
+      return result.path;
     } catch (error) {
       this.lastNarrationResult = {
-        status: 'failed', path: null, provider, model, externalTaskId: null,
+        status: 'failed', path: null, provider: 'router', model: null, externalTaskId: null,
         generatedAt: new Date().toISOString(), simulated: false, error: error.message,
-        cost: { provider, amount: null, currency: null, invoiceRequired: provider !== 'simulation' }
+        cost: { provider: 'router', amount: null, currency: null, invoiceRequired: false }
       };
       this.logger.error('TTS generation failed:', error);
       throw error;
@@ -193,12 +142,7 @@ class AIVideoGenerator {
 
   async generateVisualAssets(prompt, style = "ethereal", count = 1) {
     this.logger.info(`Generating ${count} visual assets with style: ${style}`);
-
     try {
-      if (!this.openai && !this.gemini) {
-        return await this.simulateVisualAssets(prompt, style, count);
-      }
-
       const enhancedPrompt = this.enhanceVisualPrompt(prompt, style);
       const localPaths = [];
 
@@ -212,22 +156,13 @@ class AIVideoGenerator {
       return localPaths;
     } catch (error) {
       this.logger.error('Visual asset generation failed:', error);
-      return await this.simulateVisualAssets(prompt, style, count);
+      throw error; // No fallback simulation
     }
   }
 
   async generateImage(prompt, imagePath) {
-    await fs.mkdir(path.dirname(imagePath), { recursive: true });
-
-    if (this.openai) {
-      return await this.generateOpenAIImage(prompt, imagePath);
-    }
-
-    if (this.gemini) {
-      return await this.generateGeminiImage(prompt, imagePath);
-    }
-
-    throw new Error('No image generation provider configured');
+    const result = await this.router.generateImage({ prompt, outputPath: imagePath });
+    return result.path;
   }
 
   async generateOpenAIImage(prompt, imagePath) {
@@ -357,9 +292,12 @@ class AIVideoGenerator {
           return produced;
         }
       }
-
+      
       const produced = await this.generateSlideshowVideo(script, visualAssets, audioPath, outputPath);
       this.lastVideoResult = { requestedProvider: 'slideshow', actualProvider: 'slideshow', model: 'local-ffmpeg', mode: 'slideshow', generatedSeconds: 0, tasks: [], scenes: [] };
+      
+      const usable = await this.isUsableVideoFile(produced);
+      if (!usable) throw new Error('Video generation produced an invalid or empty MP4 file');
       return produced;
     } catch (error) {
       // The Logger's console line only shows the message string, so put the real
@@ -377,12 +315,7 @@ class AIVideoGenerator {
         return produced;
       } catch (fallbackError) {
         this.logger.error(`Local slideshow fallback failed: ${fallbackError.message}`, fallbackError);
-        const produced = await this.simulateVideoGeneration(script, visualAssets, audioPath, outputPath);
-        this.lastVideoResult = {
-          requestedProvider: 'configured-provider', actualProvider: 'simulation', model: null,
-          mode: 'simulation', generatedSeconds: 0, fallbackReason: `${reason}; ${fallbackError.message}`, tasks: [], scenes: []
-        };
-        return produced;
+        throw fallbackError;
       }
     }
   }
@@ -855,6 +788,20 @@ class AIVideoGenerator {
     }
   }
 
+  async isUsableVideoFile(videoPath) {
+    if (typeof videoPath !== 'string' || !videoPath.toLowerCase().endsWith('.mp4')) {
+      return false;
+    }
+
+    try {
+      const stats = await fs.stat(videoPath);
+      // Ensure file exists and is larger than an empty MP4 container (typically > 100 bytes)
+      return stats.isFile() && stats.size > 100;
+    } catch (error) {
+      return false;
+    }
+  }
+
   async downloadVideo(url, outputPath) {
     const response = await axios({
       method: 'GET',
@@ -887,10 +834,6 @@ class AIVideoGenerator {
     this.logger.info('Generating custom thumbnail...');
 
     try {
-      if (!this.openai && !this.gemini) {
-        return await this.simulateThumbnailGeneration(script, style);
-      }
-
       const prompt = `YouTube thumbnail for "${script.title}", ${style} style, eye-catching, high contrast text, professional design, clickable, engaging`;
       const thumbnailPath = path.join(__dirname, '..', 'uploads', 'thumbnails', `thumbnail_${Date.now()}.png`);
 
@@ -904,7 +847,7 @@ class AIVideoGenerator {
       };
     } catch (error) {
       this.logger.error('Thumbnail generation failed:', error);
-      return await this.simulateThumbnailGeneration(script, style);
+      throw error;
     }
   }
 
@@ -913,75 +856,8 @@ class AIVideoGenerator {
     return stats.size;
   }
 
-  // Simulation methods for when APIs are not available
-  async simulateTTSGeneration(text, outputPath) {
-    this.logger.info('Simulating TTS generation...');
-    
-    const infoPath = outputPath + '.info';
-    await fs.writeFile(infoPath, JSON.stringify({
-      message: 'AI TTS audio would be generated here',
-      text: text.substring(0, 100) + '...',
-      timestamp: new Date().toISOString()
-    }, null, 2));
-    
-    return infoPath;
-  }
+  // Simulation methods have been removed.
 
-  async simulateVisualAssets(prompt, style, count) {
-    this.logger.info(`Simulating ${count} visual assets...`);
-    
-    const paths = [];
-    for (let i = 0; i < count; i++) {
-      const assetPath = path.join(__dirname, '..', 'data', 'assets', `visual_sim_${Date.now()}_${i}.info`);
-      
-      await fs.writeFile(assetPath, JSON.stringify({
-        message: 'AI visual asset would be generated here',
-        prompt: prompt,
-        style: style,
-        timestamp: new Date().toISOString()
-      }, null, 2));
-      
-      paths.push(assetPath);
-    }
-    
-    return paths;
-  }
-
-  async simulateVideoGeneration(script, visualAssets, audioPath, outputPath) {
-    this.logger.info('Simulating video generation...');
-    
-    const infoPath = outputPath + '.info';
-    await fs.writeFile(infoPath, JSON.stringify({
-      message: 'AI video would be generated here',
-      script: script.title,
-      visualAssets: visualAssets.length,
-      audioPath: audioPath,
-      timestamp: new Date().toISOString()
-    }, null, 2));
-    
-    return infoPath;
-  }
-
-  async simulateThumbnailGeneration(script, style) {
-    this.logger.info('Simulating thumbnail generation...');
-    
-    const thumbnailPath = path.join(__dirname, '..', 'uploads', 'thumbnails', `thumbnail_sim_${Date.now()}.info`);
-    await fs.mkdir(path.dirname(thumbnailPath), { recursive: true });
-    
-    await fs.writeFile(thumbnailPath, JSON.stringify({
-      message: 'AI thumbnail would be generated here',
-      title: script.title,
-      style: style,
-      timestamp: new Date().toISOString()
-    }, null, 2));
-    
-    return {
-      path: thumbnailPath,
-      dimensions: { width: 1792, height: 1024 },
-      fileSize: 1024,
-      simulated: true
-    };
-  }
 }
 
 module.exports = { AIVideoGenerator };

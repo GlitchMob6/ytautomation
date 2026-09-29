@@ -48,81 +48,17 @@ class ContentStrategyAgent {
   }
 
   async fetchYouTubeTrends() {
-    // Use YouTube API to fetch trending videos
-    const youtube = this.credentials.getYouTubeClient();
-    
-    try {
-      const response = await youtube.videos.list({
-        part: 'snippet,statistics',
-        chart: 'mostPopular',
-        maxResults: 50,
-        regionCode: process.env.YOUTUBE_REGION || 'US'
-      });
-
-      return response.data.items.map(video => ({
-        videoId: video.id,
-        title: video.snippet.title,
-        tags: video.snippet.tags || [],
-        viewCount: parseInt(video.statistics?.viewCount, 10) || 0,
-        category: video.snippet.categoryId,
-        publishedAt: video.snippet.publishedAt,
-        publisher: video.snippet.channelTitle || 'YouTube',
-        url: `https://www.youtube.com/watch?v=${video.id}`
-      }));
-    } catch (error) {
-      this.logger.error('Failed to fetch YouTube trends:', error);
-      return [];
-    }
+    this.logger.info('YouTube trend fetching disabled (content-only mode).');
+    return [];
   }
 
   async analyzeCompetitors() {
-    const competitorChannels = (process.env.COMPETITOR_CHANNELS || '').split(',');
-    const competitorData = [];
-
-    for (const channelId of competitorChannels) {
-      if (!channelId) continue;
-      
-      try {
-        const videos = await this.getChannelVideos(channelId);
-        const analysis = this.analyzeVideoPerformance(videos);
-        competitorData.push({
-          channelId,
-          topPerformingTopics: analysis.topTopics,
-          averageViews: analysis.avgViews,
-          uploadFrequency: analysis.frequency
-        });
-      } catch (error) {
-        this.logger.error(`Failed to analyze competitor ${channelId}:`, error);
-      }
-    }
-
-    return competitorData;
+    this.logger.info('Competitor analysis disabled (content-only mode).');
+    return [];
   }
 
   async getChannelVideos(channelId) {
-    const youtube = this.credentials.getYouTubeClient();
-    
-    try {
-      const response = await youtube.search.list({
-        part: 'snippet',
-        channelId: channelId,
-        maxResults: 20,
-        order: 'date',
-        type: 'video'
-      });
-
-      const videoIds = response.data.items.map(item => item.id.videoId).join(',');
-      
-      const videoDetails = await youtube.videos.list({
-        part: 'statistics,snippet',
-        id: videoIds
-      });
-
-      return videoDetails.data.items;
-    } catch (error) {
-      this.logger.error(`Failed to get videos for channel ${channelId}:`, error);
-      return [];
-    }
+    return [];
   }
 
   analyzeVideoPerformance(videos) {

@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-09-29T04:25:00.301Z",
+  "system": {},
+  "requirements": {
+    "env:nodejs": {
+      "status": "READY",
+      "details": "Node.js 22.14.0 detected.",
+      "timestamp": "2026-09-29T04:25:00.302Z"
+    },
+    "hw:ram": {
+      "status": "WARNING",
+      "details": "15.6 GB RAM detected. 16GB recommended.",
+      "timestamp": "2026-09-29T04:25:00.302Z"
+    },
+    "hw:gpu": {
+      "status": "READY",
+      "details": "GPU detected: NVIDIA GeForce RTX 3050 A Laptop GPU, 4094 MiB",
+      "timestamp": "2026-09-29T04:25:00.367Z"
+    },
+    "dep:ffmpeg": {
+      "status": "READY",
+      "details": "FFmpeg is installed and accessible.",
+      "timestamp": "2026-09-29T04:25:00.384Z"
+    },
+    "dep:playwright": {
+      "status": "READY",
+      "details": "Playwright is installed.",
+      "timestamp": "2026-09-29T04:25:00.385Z"
+    }
+  },
+  "capabilities": {
+    "TEXT_GENERATION": true,
+    "NARRATION": true,
+    "IMAGE_GENERATION": true,
+    "VIDEO_GENERATION": true,
+    "CAPTION_GENERATION": true,
+    "VIDEO_ASSEMBLY": true,
+    "THUMBNAIL_GENERATION": true,
+    "SEO_GENERATION": true,
+    "EXPORT": true
+  },
+  "overallReady": true
+}
