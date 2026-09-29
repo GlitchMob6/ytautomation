@@ -86,10 +86,11 @@ function buildInitialSceneManifest(production = {}, providerResult = {}) {
 
   return blueprints.map((scene, position) => {
     const generatedScene = generated.find(item => String(item.label || '').toLowerCase() === scene.label.toLowerCase()) || generated[position];
-    const imagePath = visualAssets[position % Math.max(1, visualAssets.length)] || null;
-    const assetPath = generatedScene?.path || imagePath;
-    const assetType = generatedScene?.path ? 'video' : imagePath ? 'image' : 'missing';
-    const provider = generatedScene?.provider || (assetType === 'image' ? 'image-provider' : providerResult.actualProvider || 'slideshow');
+    const imageAsset = visualAssets[position % Math.max(1, visualAssets.length)] || null;
+    const isImageObj = imageAsset && typeof imageAsset === 'object' && !Array.isArray(imageAsset);
+    const assetPath = generatedScene?.path || (isImageObj ? imageAsset.path : imageAsset);
+    const assetType = generatedScene?.path ? 'video' : imageAsset ? 'image' : 'missing';
+    const provider = generatedScene?.provider || (assetType === 'image' ? (isImageObj && imageAsset.provider ? imageAsset.provider : 'image-provider') : providerResult.actualProvider || 'slideshow');
     return {
       id: `scene_${crypto.randomUUID()}`,
       position,
@@ -106,7 +107,7 @@ function buildInitialSceneManifest(production = {}, providerResult = {}) {
       narrationGeneratedAt: audio.generatedAt || null,
       narrationCost: audio.cost || {},
       provider,
-      model: generatedScene?.model || providerResult.model || null,
+      model: generatedScene?.model || (assetType === 'image' ? (isImageObj && imageAsset.model ? imageAsset.model : null) : providerResult.model || null),
       externalTaskId: generatedScene?.taskId || null,
       status: assetPath ? 'ready' : 'missing_asset',
       narrationStatus,

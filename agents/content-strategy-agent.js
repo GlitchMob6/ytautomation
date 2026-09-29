@@ -164,50 +164,10 @@ class ContentStrategyAgent {
 
   async generateContentStrategy(requestedTopic = null) {
     try {
-      let topic, angle, targetAudience, contentType;
-
       const aiStrategy = await this.generateContentStrategyWithAI(requestedTopic);
-      if (aiStrategy) {
-        await this.db.saveContentStrategy(aiStrategy);
-        this.logger.info(`Generated AI strategy for: ${aiStrategy.topic}`);
-        return aiStrategy;
-      }
-
-      this.logger.info('Using template content strategy generation');
-      if (requestedTopic) {
-        topic = requestedTopic;
-        angle = await this.generateAngle(topic);
-      } else {
-        // Select from trending topics
-        const selectedTopic = this.selectOptimalTopic();
-        topic = selectedTopic.topic;
-        angle = await this.generateAngle(topic);
-      }
-
-      // Determine target audience
-      targetAudience = await this.identifyTargetAudience(topic);
-
-      // Select content type
-      contentType = this.selectContentType(topic);
-
-      // Generate content calendar entry
-      const strategy = {
-        topic,
-        angle,
-        targetAudience,
-        contentType,
-        keywords: this.extractKeywords(topic),
-        estimatedViews: this.predictViews(topic),
-        bestPublishTime: this.calculateBestPublishTime(),
-        competitorAnalysis: this.getCompetitorInsights(topic),
-        createdAt: new Date().toISOString()
-      };
-
-      // Save to database
-      await this.db.saveContentStrategy(strategy);
-
-      this.logger.info(`Generated strategy for: ${topic}`);
-      return strategy;
+      await this.db.saveContentStrategy(aiStrategy);
+      this.logger.info(`Generated AI strategy for: ${aiStrategy.topic}`);
+      return aiStrategy;
     } catch (error) {
       this.logger.error('Failed to generate content strategy:', error);
       throw error;
@@ -357,10 +317,6 @@ Do not invent trend data, statistics, sources, URLs, or factual claims. Use only
   }
 
   async generateContentStrategyWithAI(requestedTopic = null) {
-    if (!this.aiTextService.isAvailable()) {
-      this.logger.info('Using template content strategy generation because no AI text provider is configured');
-      return null;
-    }
 
     const trendingTopics = this.trendingTopics
       .slice(0, 10)
@@ -411,8 +367,8 @@ Avoid fabricated claims and unsupported numbers.`;
         createdAt: new Date().toISOString()
       };
     } catch (error) {
-      this.logger.warn(`AI content strategy failed; using template fallback: ${error.message}`);
-      return null;
+      this.logger.error(`AI content strategy failed: ${error.message}`);
+      throw error;
     }
   }
 

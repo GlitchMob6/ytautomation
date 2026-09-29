@@ -1,5 +1,5 @@
 /* ============================================================
-   Lumen console enhancement layer — motion, command palette,
+   Spud Wrench console enhancement layer — motion, command palette,
    instrumentation. Loads after app.js; touches nothing internal.
    Cross-file globals below are declared by app.js.
    ============================================================ */
@@ -31,7 +31,7 @@
   /* ---------- 1. View choreography ---------- */
   const VIEW_META = {
     overview: ['OPERATOR OVERVIEW', 'Know what happens next.', 'Overview'],
-    operator: ['AUTONOMOUS OPERATOR', 'Give Lumen the strategy.', 'Operator'],
+    operator: ['AUTONOMOUS OPERATOR', 'Give Spud Wrench the strategy.', 'Operator'],
     pipeline: ['CONTENT OPERATIONS', 'From idea to published.', 'Pipeline'],
     calendar: ['EDITORIAL PLANNING', 'Plan before you generate.', 'Calendar'],
     analytics: ['PERFORMANCE', 'Turn results into the next move.', 'Analytics'],
@@ -47,7 +47,7 @@
       const previous = currentView;
       currentView = view;
       baseSwitchView(view);
-      document.title = `${VIEW_META[view][2]} · Lumen`;
+      document.title = `${VIEW_META[view][2]} · Spud Wrench`;
       const section = $(`#${view}-view`);
       if (section) {
         // Directional slide: forward views enter from the right, back from the left.
@@ -116,7 +116,7 @@
         <kbd>esc</kbd>
       </div>
       <div class="cmdk-list" role="listbox" aria-label="Commands"></div>
-      <div class="cmdk-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span class="cmdk-brand">Lumen console</span></div>
+      <div class="cmdk-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span class="cmdk-brand">Spud Wrench console</span></div>
     </div>`;
   document.body.appendChild(palette);
   const listEl = palette.querySelector('.cmdk-list');

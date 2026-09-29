@@ -50,7 +50,7 @@ class ContentGeneratorAgent {
 
   async initialize() {
     try {
-      console.log(chalk.cyan.bold(`\n🎨 Lumen Content Studio v${version}`));
+      console.log(chalk.cyan.bold(`\n🎨 Spud Wrench v${version}`));
       console.log(chalk.gray('─'.repeat(50)));
       
       // Initialize database
@@ -113,7 +113,7 @@ class ContentGeneratorAgent {
       await fs.mkdir(path.join(__dirname, 'output', 'metadata'), { recursive: true });
       
       this.isInitialized = true;
-      this.logger.success('Lumen Content Studio initialized successfully!');
+      this.logger.success('Spud Wrench initialized successfully!');
       
       return true;
     } catch (error) {
@@ -1926,7 +1926,7 @@ class ContentGeneratorAgent {
     
     const PORT = process.env.PORT || 3456;
     this.app.listen(PORT, () => {
-      console.log(chalk.green(`\n✅ Lumen Content Studio running on port ${PORT}`));
+      console.log(chalk.green(`\n✅ Spud Wrench running on port ${PORT}`));
       console.log(chalk.gray('─'.repeat(50)));
       console.log(chalk.white('📊 Dashboard: ') + chalk.cyan(`http://localhost:${PORT}`));
       console.log(chalk.white('🔧 API Health: ') + chalk.cyan(`http://localhost:${PORT}/health`));

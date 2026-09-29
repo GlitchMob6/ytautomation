@@ -1,4 +1,4 @@
-# Lumen pre-launch readiness — 2026-08-18
+# Spud Wrench pre-launch readiness — 2026-08-18
 
 ## Completed in repository
 

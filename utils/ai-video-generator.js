@@ -148,8 +148,8 @@ class AIVideoGenerator {
 
       for (let i = 0; i < count; i++) {
         const imagePath = path.join(__dirname, '..', 'data', 'assets', `visual_${Date.now()}_${i}.png`);
-        await this.generateImage(enhancedPrompt, imagePath);
-        localPaths.push(imagePath);
+        const result = await this.generateImage(enhancedPrompt, imagePath);
+        localPaths.push(result);
       }
 
       this.logger.info(`Generated ${localPaths.length} visual assets`);
@@ -162,7 +162,7 @@ class AIVideoGenerator {
 
   async generateImage(prompt, imagePath) {
     const result = await this.router.generateImage({ prompt, outputPath: imagePath });
-    return result.path;
+    return result; // contains { path, provider, model }
   }
 
   async generateOpenAIImage(prompt, imagePath) {
@@ -293,7 +293,7 @@ class AIVideoGenerator {
         }
       }
       
-      const produced = await this.generateSlideshowVideo(script, visualAssets, audioPath, outputPath);
+      const produced = await this.generateSlideshowVideo(script, visualAssets, audioPath, outputPath, options);
       this.lastVideoResult = { requestedProvider: 'slideshow', actualProvider: 'slideshow', model: 'local-ffmpeg', mode: 'slideshow', generatedSeconds: 0, tasks: [], scenes: [] };
       
       const usable = await this.isUsableVideoFile(produced);
@@ -306,7 +306,7 @@ class AIVideoGenerator {
       const reason = error && error.message ? error.message : String(error);
       this.logger.error(`Video provider generation failed; using the local slideshow: ${reason}`, error);
       try {
-        const produced = await this.generateSlideshowVideo(script, visualAssets, audioPath, outputPath);
+        const produced = await this.generateSlideshowVideo(script, visualAssets, audioPath, outputPath, options);
         this.lastVideoResult = {
           requestedProvider: this.lastVideoResult?.requestedProvider || 'configured-provider',
           actualProvider: 'slideshow', model: 'local-ffmpeg', mode: 'fallback', generatedSeconds: 0,
@@ -399,7 +399,7 @@ class AIVideoGenerator {
     return outputPath;
   }
 
-  async generateSlideshowVideo(script, visualAssets, audioPath, outputPath) {
+  async generateSlideshowVideo(script, visualAssets, audioPath, outputPath, options = {}) {
     this.logger.info('Creating slideshow video...');
 
     if (!(await checkFFmpeg())) {
@@ -441,7 +441,7 @@ class AIVideoGenerator {
       }
 
       const videoPath = outputPath.replace('.mp4', '_visual.mp4');
-      const duration = this.calculateScriptDuration(script);
+      const duration = options?.estimatedDuration || this.calculateScriptDuration(script);
       await this.renderSlidesToVideo(stills, duration, videoPath);
 
       // Add audio
@@ -460,7 +460,7 @@ class AIVideoGenerator {
     }
 
     const fade = 0.5;
-    const perSlide = Math.max(2, totalDuration / stills.length);
+    const perSlide = Math.max(2, (totalDuration + (stills.length - 1) * fade) / stills.length);
 
     const args = ['-y'];
     for (const still of stills) {
@@ -671,16 +671,16 @@ class AIVideoGenerator {
   generateContentSlides(script, visualAssets) {
     const slides = [];
     
-    if (script.mainContent && script.mainContent.sections) {
-      script.mainContent.sections.forEach((section, index) => {
+    if (script.scenes) {
+      script.scenes.forEach((scene, index) => {
         const assetIndex = Math.min(index + 1, visualAssets.length - 1);
         
         slides.push(`
         <div class="slide">
             ${visualAssets[assetIndex] ? `<img class="background-image" src="${visualAssets[assetIndex]}" />` : ''}
             <div class="content">
-                <h2>${section.title}</h2>
-                ${this.formatSectionContent(section)}
+                <h2>${scene.purpose}</h2>
+                <p>${scene.narration.slice(0, 150)}${scene.narration.length > 150 ? '...' : ''}</p>
             </div>
         </div>`);
       });
@@ -710,35 +710,14 @@ class AIVideoGenerator {
   }
 
   calculateScriptDuration(script) {
-    // Estimate duration based on word count (average 150 words per minute)
     let totalWords = 0;
     
-    if (script.hook) totalWords += script.hook.text.split(' ').length;
-    if (script.introduction) {
-      totalWords += (script.introduction.greeting || '').split(' ').length;
-      totalWords += (script.introduction.topicIntro || '').split(' ').length;
-    }
-    
-    if (script.mainContent && script.mainContent.sections) {
-      script.mainContent.sections.forEach(section => {
-        if (typeof section.content === 'string') {
-          totalWords += section.content.split(' ').length;
-        }
-        if (section.items) {
-          section.items.forEach(item => {
-            totalWords += (item.title + ' ' + item.description).split(' ').length;
-          });
-        }
-        if (section.steps) {
-          section.steps.forEach(step => {
-            totalWords += (step.title + ' ' + step.description).split(' ').length;
-          });
-        }
+    if (script.scenes) {
+      script.scenes.forEach(scene => {
+        totalWords += (scene.narration || '').split(' ').length;
       });
-    }
-    
-    if (script.conclusion) {
-      totalWords += script.conclusion.finalThought.split(' ').length;
+    } else {
+        totalWords += 50; // fallback
     }
     
     // Convert to duration (150 words per minute)

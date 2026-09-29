@@ -1,7 +1,7 @@
 {
   "name": "content-generator",
   "version": "3.0.0",
-  "description": "Lumen Content Studio — AI-powered content generation (scripts, thumbnails, videos, SEO metadata)",
+  "description": "Spud Wrench — AI-powered content generation (scripts, thumbnails, videos, SEO metadata)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

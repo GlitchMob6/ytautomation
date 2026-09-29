@@ -32,21 +32,7 @@ class SEOOptimizerAgent {
       this.logger.info(`Optimizing SEO for: ${script.title}`);
       
       const aiSEO = await this.generateSEOWithAI(script, strategy);
-      let title, description, tags;
-
-      if (aiSEO) {
-        ({ title, description, tags } = aiSEO);
-      } else {
-        this.logger.info('Using template SEO optimization');
-        // Generate optimized title
-        title = await this.optimizeTitle(script.title, strategy);
-        
-        // Generate description
-        description = await this.generateDescription(script, strategy);
-        
-        // Extract and optimize tags
-        tags = await this.generateTags(script, strategy);
-      }
+      let { title, description, tags } = aiSEO;
       
       // Generate hashtags
       const hashtags = await this.generateHashtags(strategy);
@@ -90,10 +76,6 @@ class SEOOptimizerAgent {
   }
 
   async generateSEOWithAI(script, strategy) {
-    if (!this.aiTextService.isAvailable()) {
-      this.logger.info('Using template SEO optimization because no AI text provider is configured');
-      return null;
-    }
 
     const prompt = `You are optimizing YouTube metadata.
 Return only valid JSON with this exact shape:
@@ -130,8 +112,8 @@ Keep tags under YouTube's 500 character total guidance. Avoid fabricated statist
         tags
       };
     } catch (error) {
-      this.logger.warn(`AI SEO optimization failed; using template fallback: ${error.message}`);
-      return null;
+      this.logger.error(`AI SEO optimization failed: ${error.message}`);
+      throw error;
     }
   }
 
@@ -229,10 +211,10 @@ Keep tags under YouTube's 500 character total guidance. Avoid fabricated statist
     
     // Video overview
     description += '📺 WHAT YOU\'LL LEARN:\n';
-    if (script.mainContent && script.mainContent.sections) {
-      script.mainContent.sections.slice(0, 5).forEach(section => {
-        if (section.title) {
-          description += `• ${section.title}\n`;
+    if (script.scenes) {
+      script.scenes.slice(0, 5).forEach(scene => {
+        if (scene.purpose) {
+          description += `• ${scene.purpose}\n`;
         }
       });
     }
@@ -242,12 +224,12 @@ Keep tags under YouTube's 500 character total guidance. Avoid fabricated statist
     description += '⏱️ TIMESTAMPS:\n';
     description += '00:00 Introduction\n';
     let timestamp = 20;
-    if (script.mainContent && script.mainContent.sections) {
-      script.mainContent.sections.forEach(section => {
+    if (script.scenes) {
+      script.scenes.forEach(scene => {
         const minutes = Math.floor(timestamp / 60);
-        const seconds = timestamp % 60;
-        description += `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${section.title || 'Section'}\n`;
-        timestamp += section.duration || 60;
+        const seconds = Math.floor(timestamp % 60);
+        description += `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${scene.purpose || 'Scene'}\n`;
+        timestamp += scene.audioDuration || 15;
       });
     }
     description += '\n';
@@ -509,19 +491,19 @@ Keep tags under YouTube's 500 character total guidance. Avoid fabricated statist
     currentTime = 20; // Intro duration
     
     // Main content chapters
-    if (script.mainContent && script.mainContent.sections) {
-      script.mainContent.sections.forEach(section => {
+    if (script.scenes) {
+      script.scenes.forEach(scene => {
         const minutes = Math.floor(currentTime / 60);
         const seconds = currentTime % 60;
         const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         
         chapters.push({
           time: timeString,
-          title: section.title || 'Section',
+          title: scene.purpose || 'Scene',
           seconds: currentTime
         });
         
-        currentTime += section.duration || 60;
+        currentTime += Math.floor(scene.audioDuration || 15);
       });
     }
     

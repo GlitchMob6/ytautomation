@@ -1,7 +1,7 @@
 const { ProviderRouter } = require('./provider-router');
 const { GeminiLLMProvider, QwenLocalLLMProvider, OpenAILLMProvider } = require('./llm-provider');
-const { GeminiTTSProvider, QwenLocalTTSProvider, KokoroLocalTTSProvider, OpenAITTSProvider, ElevenLabsTTSProvider } = require('./tts-provider');
-const { GeminiImageProvider, FluxLocalImageProvider, OpenAIImageProvider } = require('./image-provider');
+const { GeminiTTSProvider, QwenLocalTTSProvider, KokoroLocalTTSProvider, OpenAITTSProvider, ElevenLabsTTSProvider, FreeTTSProvider } = require('./tts-provider');
+const { GeminiImageProvider, FluxLocalImageProvider, OpenAIImageProvider, FreeImageProvider } = require('./image-provider');
 const { SlideshowVideoProvider } = require('./video-provider');
 
 function createProviderRouter(credentials, logger) {
@@ -57,6 +57,7 @@ function createProviderRouter(credentials, logger) {
   }
   router.registerProvider(new QwenLocalTTSProvider()); // Stubbed for Phase 4
   router.registerProvider(new KokoroLocalTTSProvider()); // Stubbed for Phase 4
+  router.registerProvider(new FreeTTSProvider()); // Guaranteed fallback
 
   // --- Image ---
   if (geminiKey) {
@@ -66,6 +67,7 @@ function createProviderRouter(credentials, logger) {
     router.registerProvider(new OpenAIImageProvider(openaiKey));
   }
   router.registerProvider(new FluxLocalImageProvider()); // Stubbed for Phase 4
+  router.registerProvider(new FreeImageProvider()); // Guaranteed fallback
 
   // --- Video ---
   router.registerProvider(new SlideshowVideoProvider());

@@ -513,7 +513,7 @@ class CredentialManager {
   }
   // Validation methods
   hasAITextProvider() {
-    if (this.credentials.openai?.apiKey || this.credentials.gemini?.apiKey || this.credentials.aiProvider?.apiKey) {
+    if (this.credentials.openai?.apiKey || this.credentials.gemini?.apiKey || this.credentials.aiProvider?.apiKey || this.credentials.aiProvider?.provider === 'ollama') {
       return true;
     }
 

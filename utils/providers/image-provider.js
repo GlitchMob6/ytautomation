@@ -196,4 +196,54 @@ class OpenAIImageProvider extends BaseProvider {
   }
 }
 
-module.exports = { GeminiImageProvider, FluxLocalImageProvider, OpenAIImageProvider };
+class FreeImageProvider extends BaseProvider {
+  constructor() {
+    super('free-image', 'Pollinations.ai Free Image', 'image');
+  }
+
+  async checkAvailability() { return true; }
+
+  async generate(options) {
+    const { prompt, outputPath } = options;
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1920&height=1080&nologo=true`;
+    
+    let buffer;
+    try {
+        const { chromium } = require('playwright');
+        const browser = await chromium.launch({ headless: true });
+        const page = await browser.newPage();
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        
+        const safePrompt = prompt.substring(0, 500);
+        const targetUrl = `https://pollinations.ai/p/${encodeURIComponent(safePrompt)}?width=1920&height=1080&nologo=true`;
+        
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        // Pollinations.ai generates the image and displays it on the page
+        await page.waitForTimeout(10000); // Give it time to generate and render
+        
+        buffer = await page.screenshot({ type: 'jpeg', quality: 90 });
+        await browser.close();
+    } catch (err) {
+        console.error("Playwright Pollinations fetch failed:", err);
+        throw err;
+    }
+    
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+    
+    // We should ensure it matches the requested extension
+    const extension = path.extname(outputPath).toLowerCase();
+    const output = sharp(buffer, { failOn: 'error' });
+    
+    if (extension === '.jpg' || extension === '.jpeg') {
+      await output.jpeg({ quality: 92 }).toFile(outputPath);
+    } else if (extension === '.webp') {
+      await output.webp({ quality: 92 }).toFile(outputPath);
+    } else {
+      await output.png().toFile(outputPath);
+    }
+    
+    return { path: outputPath, provider: this.id };
+  }
+}
+
+module.exports = { GeminiImageProvider, FluxLocalImageProvider, OpenAIImageProvider, FreeImageProvider };

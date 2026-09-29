@@ -167,4 +167,57 @@ class ElevenLabsTTSProvider extends BaseProvider {
   }
 }
 
-module.exports = { GeminiTTSProvider, QwenLocalTTSProvider, KokoroLocalTTSProvider, OpenAITTSProvider, ElevenLabsTTSProvider };
+class FreeTTSProvider extends BaseProvider {
+  constructor() {
+    super('free-tts', 'Free Unauthenticated TTS', 'tts');
+  }
+
+  async checkAvailability() { return true; } // Always available
+
+  async generate(options) {
+    const { text, outputPath } = options;
+    const maxLen = 199;
+    
+    // Split text into safe chunks
+    const chunks = [];
+    let currentChunk = '';
+    const words = text.split(' ');
+    
+    for (const word of words) {
+        if (currentChunk.length + word.length + 1 > maxLen) {
+            chunks.push(currentChunk);
+            currentChunk = word;
+        } else {
+            currentChunk += (currentChunk.length > 0 ? ' ' : '') + word;
+        }
+    }
+    if (currentChunk) chunks.push(currentChunk);
+
+    const chunkFiles = [];
+    for (let i = 0; i < chunks.length; i++) {
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encodeURIComponent(chunks[i])}`;
+        const response = await axios({ method: 'GET', url: url, responseType: 'arraybuffer' });
+        const chunkPath = outputPath + '_part' + i + '.mp3';
+        await fs.writeFile(chunkPath, Buffer.from(response.data));
+        chunkFiles.push(chunkPath);
+        await new Promise(resolve => setTimeout(resolve, 500)); // Delay to avoid rate limit
+    }
+
+    // Concatenate chunks using ffmpeg
+    const listPath = outputPath + '_list.txt';
+    const listContent = chunkFiles.map(f => `file '${f.replace(/\\/g, '/')}'`).join('\n');
+    await fs.writeFile(listPath, listContent);
+    
+    await runFFmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listPath, outputPath]);
+    
+    // Cleanup
+    await fs.unlink(listPath).catch(() => {});
+    for (const f of chunkFiles) {
+        await fs.unlink(f).catch(() => {});
+    }
+
+    return { path: outputPath, provider: this.id };
+  }
+}
+
+module.exports = { GeminiTTSProvider, QwenLocalTTSProvider, KokoroLocalTTSProvider, OpenAITTSProvider, ElevenLabsTTSProvider, FreeTTSProvider };

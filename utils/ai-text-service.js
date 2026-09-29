@@ -23,14 +23,13 @@ class AITextService {
   }
 
   async generateText(prompt, options = {}) {
-    return await this.router.generateText({ prompt, ...options });
+    const provider = await this.router.getBestProvider('llm');
+    this.providerId = provider.id;
+    this.providerName = provider.name;
+    this.providerModel = provider.model;
+    return await provider.generate({ prompt, ...options });
   }
 
-  isAvailable() {
-    // We assume it's available if there's at least one provider.
-    // ProviderRouter throws on generation if none available, which is handled upstream.
-    return true;
-  }
 }
 
 module.exports = { AITextService, PROVIDERS, GEMINI_MODELS, GEMINI_DEFAULT_MODEL };

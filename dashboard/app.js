@@ -95,7 +95,7 @@ function renderFriendlyError(errorText, context = 'A process') {
   if (!errorText) return '';
   const safeText = escapeHTML(String(errorText));
   const encoded = encodeURIComponent(String(errorText));
-  const copyJs = `navigator.clipboard.writeText('Please fix this error in Lumen Content Studio: ' + decodeURIComponent('${encoded}')); showToast('Error copied! Paste it to your Antigravity AI assistant to fix it.', 'success');`;
+  const copyJs = `navigator.clipboard.writeText('Please fix this error in Spud Wrench: ' + decodeURIComponent('${encoded}')); showToast('Error copied! Paste it to your Antigravity AI assistant to fix it.', 'success');`;
   
   return `<div style="background: rgba(255, 77, 94, 0.1); border-left: 4px solid #ff4d5e; padding: 12px 16px; margin: 12px 0; border-radius: 4px;">
     <h4 style="margin: 0 0 4px 0; color: #ff4d5e; display: flex; align-items: center; gap: 8px;">
@@ -433,7 +433,7 @@ function renderLearning(learning = {}) {
           ${item.status !== 'rejected' ? `<button class="text-button" data-learning-action="reject" data-learning-id="${escapeHTML(item.id)}">Reject</button>` : ''}
         </span>
       </div>
-    </article>`).join('') : empty('No recommendation yet. Lumen needs at least two real, sufficiently exposed measurements.');
+    </article>`).join('') : empty('No recommendation yet. Spud Wrench needs at least two real, sufficiently exposed measurements.');
 }
 
 function renderGrowthExperiments(summary = {}) {
@@ -701,7 +701,7 @@ function renderActivation(activation = {}) {
   if (milestones.firstRealVideo?.achieved) {
     container.insertAdjacentHTML('beforeend', `
       <div class="activation-share">
-        <span>Made something real with Lumen?</span>
+        <span>Made something real with Spud Wrench?</span>
         <a class="button secondary small" href="https://github.com/darkzOGx/youtube-automation-agent/discussions/new?category=show-and-tell" target="_blank" rel="noreferrer">Share what you built</a>
       </div>`);
   }
@@ -814,7 +814,7 @@ function switchView(view) {
   $$('.view').forEach(item => item.classList.toggle('active', item.id === `${view}-view`));
   const titles = {
     overview: ['OPERATOR OVERVIEW', 'Know what happens next.'],
-    operator: ['AUTONOMOUS OPERATOR', 'Give Lumen the strategy.'],
+    operator: ['AUTONOMOUS OPERATOR', 'Give Spud Wrench the strategy.'],
     pipeline: ['CONTENT OPERATIONS', 'From idea to published.'],
     calendar: ['EDITORIAL PLANNING', 'Plan before you generate.'],
     analytics: ['PERFORMANCE', 'Turn results into the next move.'],
@@ -1272,7 +1272,7 @@ document.addEventListener('click', async event => {
     const id = experiment.dataset.experimentId;
     const prompts = {
       approve: 'Approve this complete experiment plan? This does not change YouTube yet.',
-      start: 'Start this live test? Lumen will rotate only the approved arms and restore the control before asking you to adopt a winner.',
+      start: 'Start this live test? Spud Wrench will rotate only the approved arms and restore the control before asking you to adopt a winner.',
       adopt: 'Adopt the evidence-backed winner on YouTube and approve its learning for future plans?',
       cancel: 'Cancel this experiment and restore the control title and thumbnail?'
     };

@@ -58,9 +58,9 @@ class QwenLocalLLMProvider extends BaseProvider {
 
   async checkAvailability() {
     try {
-      // Attempt a fast models list fetch to verify the server is up
-      await this.client.models.list();
-      return true;
+      const response = await this.client.models.list();
+      const models = response.data.map(m => m.id);
+      return models.includes(this.model);
     } catch (e) {
       return false;
     }
