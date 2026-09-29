@@ -355,6 +355,7 @@
     let currentStep = 0, selectedAI = null, aiKeyVerified = false, selectedVideo = 'slideshow';
 
     const AI_PROVIDERS = {
+      ollama:     { name: 'Ollama (Local)', desc: 'Run open-source models locally', free: true, hint: 'Default is http://127.0.0.1:11434', keyUrl: 'https://ollama.com', models: ['qwen2.5:9b','llama3:8b','mistral'], default: 'qwen2.5:9b', isLocal: true },
       gemini:     { name: 'Google Gemini', desc: 'Free text & TTS tiers; paid AI images', free: true, hint: 'Starts with "AIza"', keyUrl: 'https://aistudio.google.com/apikey', models: ['gemini-3.7-flash','gemini-3.1-pro-preview','gemini-3.5-flash-lite'], default: 'gemini-3.7-flash' },
       openai:     { name: 'OpenAI', desc: 'GPT-5.6 text, DALL-E images, TTS voice', free: false, hint: 'Starts with "sk-"', keyUrl: 'https://platform.openai.com/api-keys', models: ['gpt-5.6','gpt-5.6-terra','gpt-5.6-luna'], default: 'gpt-5.6' },
       openrouter: { name: 'OpenRouter', desc: 'One key, 400+ models (pay per use)', free: false, hint: 'Starts with "sk-or-"', keyUrl: 'https://openrouter.ai/keys', models: ['google/gemini-3.7-flash','openai/gpt-5.6-sol','anthropic/claude-fable-5','moonshotai/kimi-k3'], default: 'google/gemini-3.7-flash' },
@@ -364,6 +365,7 @@
     };
 
     const VIDEO_PROVIDERS = {
+      flux_kokoro: { name: 'FLUX + Kokoro (Local)', desc: 'Free — Generate images & voice locally', free: true, needsKey: false },
       slideshow:   { name: 'Local slideshow', desc: 'Free — FFmpeg assembly from stills + narration', free: true, needsKey: false },
       seedance:    { name: 'Seedance 2.5', desc: 'ByteDance — cinematic 30s scenes', free: false, needsKey: true, keyLabel: 'Replicate API token', keyUrl: 'https://replicate.com/account/api-tokens' },
       minimax_h3:  { name: 'MiniMax H3', desc: 'Multimodal native-audio video', free: false, needsKey: true, keyLabel: 'MiniMax API key', keyUrl: 'https://platform.minimax.io' },
@@ -411,14 +413,18 @@
       ).join('');
     }
 
+    document.getElementById('btn-next-0').addEventListener('click', function() {
+      goStep(1);
+    });
+
     function selectAI(id) {
       selectedAI = id; aiKeyVerified = false;
       document.querySelectorAll('#ai-providers .provider-card').forEach(c => c.classList.toggle('selected', c.dataset.provider === id));
       const p = AI_PROVIDERS[id], panel = document.getElementById('ai-key-panel');
       panel.style.display = 'block';
-      document.getElementById('ai-key-label').textContent = p.name + ' API Key';
-      document.getElementById('ai-key-hint').innerHTML = p.hint + ' — <a href="'+p.keyUrl+'" target="_blank">Get your key →</a>';
-      document.getElementById('ai-key-input').value = '';
+      document.getElementById('ai-key-label').textContent = p.isLocal ? p.name + ' Endpoint URL' : p.name + ' API Key';
+      document.getElementById('ai-key-hint').innerHTML = p.hint + (p.isLocal ? '' : ' — <a href="'+p.keyUrl+'" target="_blank">Get your key →</a>');
+      document.getElementById('ai-key-input').value = p.isLocal ? 'http://127.0.0.1:11434' : '';
       document.getElementById('ai-model-select').innerHTML = p.models.map(m => '<option value="'+m+'"'+(m===p.default?' selected':'')+'>'+m+'</option>').join('');
       document.getElementById('btn-test-key').disabled = false;
       document.getElementById('btn-next-1').disabled = true;

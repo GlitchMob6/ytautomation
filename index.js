@@ -73,14 +73,15 @@ class ContentGeneratorAgent {
       this.credentials = new CredentialManager();
       const credentialsValid = await this.credentials.validateAll();
       this.readiness = new ProductionReadinessService(this.db, this.credentials);
+      const setupCompleted = await this.db.getSetting('setup_completed');
       
-      if (!credentialsValid) {
-        console.log(chalk.yellow('\n⚠️  Some credentials are missing or invalid.'));
-        console.log(chalk.yellow('Run: npm run credentials:setup'));
+      if (setupCompleted !== 'true') {
+        console.log(chalk.yellow('\n⚠️  System setup is incomplete.'));
+        console.log(chalk.yellow('Dashboard will run in setup mode. Visit http://localhost:3456 to complete walkthrough.'));
         this.setupRequired = true;
         this.setupAPI();
         this.isInitialized = true;
-        this.logger.warn('Dashboard started in setup mode; generation and publishing are disabled');
+        this.logger.warn('Dashboard started in setup mode; normal application is disabled until setup is complete');
         return true;
       }
       
@@ -342,7 +343,7 @@ class ContentGeneratorAgent {
   }
   setupAPI() {
     this.app.use(express.json({ limit: '1mb' }));
-    this.app.use(express.static(path.join(__dirname, 'dashboard')));
+    this.app.use(express.static(path.join(__dirname, 'dashboard'), { index: false }));
     
     // Mount walkthrough GUI API
     mountWalkthroughAPI(this.app);
@@ -355,7 +356,38 @@ class ContentGeneratorAgent {
     }
     
     // Main dashboard route
-    this.app.get('/', (req, res) => {
+    this.app.get('/', async (req, res) => {
+      try {
+        const setupCompleted = await this.db.getSetting('setup_completed');
+        
+        if (setupCompleted !== 'true') {
+          return res.redirect('/walkthrough');
+        }
+
+        // Transition from setup to normal app without restart
+        if (this.setupRequired) {
+          this.logger.info('Setup completed detected during runtime. Transitioning to normal application...');
+          this.setupRequired = false;
+          await this.credentials.loadCredentials();
+          await this.initializeAgents();
+          
+          this.aiTextService = new AITextService(this.credentials?.credentials || {});
+          
+          // Re-log capabilities to verify
+          try {
+            const capabilities = await this.logCapabilitySummary();
+            if (capabilities && capabilities.hasText && capabilities.hasFFmpeg) {
+              await this.activation.markSetupReady(capabilities);
+            }
+          } catch (err) {
+            this.logger.warn('Failed to log capability summary during transition:', err.message);
+          }
+          this.logger.success('Transitioned to normal application mode successfully.');
+        }
+      } catch (e) {
+        // Fallback to old behavior
+        this.logger.warn('Error in root route:', e);
+      }
       res.sendFile(path.join(__dirname, 'dashboard', 'index.html'));
     });
     

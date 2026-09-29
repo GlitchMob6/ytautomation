@@ -24,7 +24,11 @@ function createProviderRouter(credentials, logger) {
   };
   
   const providerType = credentials?.aiProvider?.provider;
-  if (providerType && PROVIDERS[providerType] && credentials?.aiProvider?.apiKey) {
+  if (providerType === 'ollama' && credentials?.aiProvider?.endpointUrl) {
+    let url = credentials.aiProvider.endpointUrl.replace(/\/$/, '');
+    if (!url.endsWith('/v1')) url += '/v1';
+    router.registerProvider(new QwenLocalLLMProvider(url, credentials.aiProvider.model || 'qwen2.5:9b'));
+  } else if (providerType && PROVIDERS[providerType] && credentials?.aiProvider?.apiKey) {
     const p = PROVIDERS[providerType];
     router.registerProvider(new OpenAILLMProvider(providerType, p.name, credentials.aiProvider.apiKey, p.baseURL, credentials.aiProvider.model || p.defaultModel));
   } else {

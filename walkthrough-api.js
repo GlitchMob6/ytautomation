@@ -25,7 +25,8 @@ const PROVIDER_SAVE_MAP = {
   openrouter(creds, apiKey, model) { creds.aiProvider = { provider: 'openrouter', apiKey, model }; },
   kimi(creds, apiKey, model)       { creds.aiProvider = { provider: 'kimi', apiKey, model }; },
   mimo(creds, apiKey, model)       { creds.aiProvider = { provider: 'mimo', apiKey, model }; },
-  glm(creds, apiKey, model)        { creds.aiProvider = { provider: 'glm', apiKey, model }; }
+  glm(creds, apiKey, model)        { creds.aiProvider = { provider: 'glm', apiKey, model }; },
+  ollama(creds, endpointUrl, model){ creds.ollama = { endpointUrl }; creds.aiProvider = { provider: 'ollama', endpointUrl, model }; }
 };
 
 const VIDEO_SAVE_MAP = {
@@ -73,7 +74,6 @@ function mountWalkthroughAPI(app) {
       try {
         const db = new Database();
         await db.initialize();
-        await db.close();
         dbOk = true;
       } catch (_) { /* ignore */ }
       checks.push({ name: 'Database', ok: dbOk, hint: 'Database initialization failed' });
@@ -120,9 +120,14 @@ function mountWalkthroughAPI(app) {
       if (!provider || !apiKey) return res.status(400).json({ success: false, error: 'Provider and API key are required' });
 
       // Build a minimal credentials object for AITextService
-      const testCreds = { aiProvider: { provider, apiKey, model } };
-      if (provider === 'gemini') testCreds.gemini = { apiKey };
-      if (provider === 'openai') testCreds.openai = { apiKey };
+      let testCreds;
+      if (provider === 'ollama') {
+        testCreds = { aiProvider: { provider, endpointUrl: apiKey, model }, ollama: { endpointUrl: apiKey } };
+      } else {
+        testCreds = { aiProvider: { provider, apiKey, model } };
+        if (provider === 'gemini') testCreds.gemini = { apiKey };
+        if (provider === 'openai') testCreds.openai = { apiKey };
+      }
 
       const service = new AITextService(testCreds);
       const reply = await service.generateText('Reply with the single word OK.', { maxTokens: 20, temperature: 0 });
@@ -167,8 +172,8 @@ function mountWalkthroughAPI(app) {
         db = new Database();
         await db.initialize();
         await db.setSetting('video_provider', provider);
-      } finally {
-        if (db) await db.close();
+      } catch(e) {
+        // ignore
       }
 
       res.json({ success: true });
@@ -198,6 +203,18 @@ function mountWalkthroughAPI(app) {
         preferredPostTime: cm.credentials.content?.preferredPostTime || '14:00'
       };
       await cm.saveCredentials();
+
+      let db;
+      try {
+        db = new Database();
+        await db.initialize();
+        await db.saveChannelProfile({
+          channelName: channelName || 'My Content Studio',
+          targetAudience: targetAudience || 'General audience interested in educational content'
+        });
+      } catch (e) {
+        // ignore
+      }
 
       res.json({ success: true });
     } catch (error) {

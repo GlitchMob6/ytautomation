@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "setup": "node setup.js",
-    "walkthrough": "node walkthrough.js",
+    "setup": "node index.js",
+    "setup:reset": "node scripts/reset-setup.js",
     "growth:snapshot": "node scripts/growth/snapshot-github.js",
     "scheduler": "node schedules/daily-automation.js",
     "test": "node test.js",
