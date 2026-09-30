@@ -201,38 +201,62 @@ class FreeImageProvider extends BaseProvider {
     super('free-image', 'Pollinations.ai Free Image', 'image');
   }
 
-  async checkAvailability() { return true; }
+  async checkAvailability() {
+    // Do a lightweight HEAD check to confirm the API is reachable
+    try {
+      const res = await axios.head('https://image.pollinations.ai', { timeout: 5000 });
+      return res.status < 500;
+    } catch (e) {
+      return false;
+    }
+  }
 
   async generate(options) {
     const { prompt, outputPath } = options;
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1920&height=1080&nologo=true`;
+    // Direct image API endpoint - returns raw image bytes, not a web page
+    // Note: Pollinations free tier limits free direct queries to <= 1280x720 (1080p direct returns 402 Payment Required).
+    // We request 1280x720 and upscale to full 1920x1080 via sharp.
+    const seed = Math.floor(Math.random() * 1000000);
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1280&height=720&nologo=true&seed=${seed}`;
     
     let buffer;
-    try {
-        const { chromium } = require('playwright');
-        const browser = await chromium.launch({ headless: true });
-        const page = await browser.newPage();
-        await page.setViewportSize({ width: 1920, height: 1080 });
-        
-        const safePrompt = prompt.substring(0, 500);
-        const targetUrl = `https://pollinations.ai/p/${encodeURIComponent(safePrompt)}?width=1920&height=1080&nologo=true`;
-        
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        // Pollinations.ai generates the image and displays it on the page
-        await page.waitForTimeout(10000); // Give it time to generate and render
-        
-        buffer = await page.screenshot({ type: 'jpeg', quality: 90 });
-        await browser.close();
-    } catch (err) {
-        console.error("Playwright Pollinations fetch failed:", err);
-        throw err;
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await axios.get(url, {
+          responseType: 'arraybuffer',
+          timeout: 60000,
+          headers: { 'Accept': 'image/jpeg,image/png,image/webp,image/*' }
+        });
+
+        // Validate the response is actually an image, not an HTML page
+        const contentType = response.headers['content-type'] || '';
+        if (!contentType.startsWith('image/')) {
+          throw new Error(`Pollinations.ai returned non-image content-type: "${contentType}". The API may have returned an HTML error page.`);
+        }
+
+        buffer = Buffer.from(response.data);
+
+        // Validate the image bytes are parseable and have real dimensions
+        const metadata = await sharp(buffer, { failOn: 'error' }).metadata();
+        if (!metadata.width || !metadata.height || metadata.width < 100 || metadata.height < 100) {
+          throw new Error(`Image validation failed: got ${metadata.width}x${metadata.height} — too small or invalid.`);
+        }
+
+        break; // success
+      } catch (err) {
+        lastError = err;
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 2000 * attempt));
+        }
+      }
     }
+    if (!buffer) throw new Error(`Pollinations.ai image generation failed after 3 attempts: ${lastError?.message}`);
     
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     
-    // We should ensure it matches the requested extension
     const extension = path.extname(outputPath).toLowerCase();
-    const output = sharp(buffer, { failOn: 'error' });
+    const output = sharp(buffer, { failOn: 'error' }).resize(1920, 1080, { fit: 'cover' });
     
     if (extension === '.jpg' || extension === '.jpeg') {
       await output.jpeg({ quality: 92 }).toFile(outputPath);

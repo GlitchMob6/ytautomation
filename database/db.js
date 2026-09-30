@@ -485,6 +485,9 @@ class Database {
         contains_synthetic_media INTEGER DEFAULT 0,
         estimated_cost TEXT NOT NULL DEFAULT '{}',
         actual_cost TEXT NOT NULL DEFAULT '{}',
+        caption_mapping TEXT NOT NULL DEFAULT '[]',
+        start_time REAL NOT NULL DEFAULT 0,
+        end_time REAL NOT NULL DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(production_id, position),
@@ -787,7 +790,10 @@ class Database {
       narration_task_id: 'TEXT',
       narration_error: 'TEXT',
       narration_generated_at: 'TEXT',
-      narration_cost: "TEXT NOT NULL DEFAULT '{}'"
+      narration_cost: "TEXT NOT NULL DEFAULT '{}'",
+      caption_mapping: "TEXT NOT NULL DEFAULT '[]'",
+      start_time: "REAL NOT NULL DEFAULT 0",
+      end_time: "REAL NOT NULL DEFAULT 0"
     });
     await this.ensureColumns('channel_strategies', {
       primary_kpi: "TEXT DEFAULT 'views'",
@@ -1278,6 +1284,11 @@ class Database {
     await this.executeQuery('DELETE FROM production_scenes WHERE production_id = ?', [productionId]);
     for (const [position, scene] of scenes.entries()) {
       const id = scene.id || this.generateId('scene');
+      const scriptText = scene.narration || scene.scriptText || '';
+      const prompt = scene.visual_prompt || scene.prompt || '';
+      const captionMapping = JSON.stringify(scene.captionMapping || scene.captions || []);
+      const startTime = Number(scene.startTime ?? 0);
+      const endTime = Number(scene.endTime ?? (startTime + (scene.duration || 0)));
       await this.executeQuery(
         `INSERT INTO production_scenes (
           id, production_id, position, label, script_text, prompt, duration,
@@ -1286,10 +1297,10 @@ class Database {
           narration_generated_at, narration_cost, provider, model,
           external_task_id, status, narration_status, revision, locked,
           rights_confirmed, provenance_source_ids, contains_synthetic_media,
-          estimated_cost, actual_cost
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          estimated_cost, actual_cost, caption_mapping, start_time, end_time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          id, productionId, position, scene.label, scene.scriptText || '', scene.prompt || '', scene.duration,
+          id, productionId, position, scene.label, scriptText, prompt, scene.duration,
           scene.assetType || 'missing', scene.assetOrigin || 'generated', scene.assetPath || null,
           scene.audioPath || null, scene.narrationProvider || null, scene.narrationModel || null,
           scene.narrationTaskId || null, scene.narrationError || null, scene.narrationGeneratedAt || null,
@@ -1297,7 +1308,8 @@ class Database {
           scene.status || 'ready', scene.narrationStatus || 'current', scene.revision || 1,
           scene.locked ? 1 : 0, scene.rightsConfirmed ? 1 : 0,
           JSON.stringify(scene.provenanceSourceIds || []), scene.containsSyntheticMedia ? 1 : 0,
-          JSON.stringify(scene.estimatedCost || {}), JSON.stringify(scene.actualCost || {})
+          JSON.stringify(scene.estimatedCost || {}), JSON.stringify(scene.actualCost || {}),
+          captionMapping, startTime, endTime
         ]
       );
     }
@@ -1323,6 +1335,11 @@ class Database {
     const current = await this.getProductionScene(productionId, sceneId);
     if (!current) return null;
     const next = { ...current, ...changes };
+    const scriptText = next.narration || next.scriptText || '';
+    const prompt = next.visual_prompt || next.prompt || '';
+    const captionMapping = JSON.stringify(next.captionMapping || next.captions || []);
+    const startTime = Number(next.startTime ?? 0);
+    const endTime = Number(next.endTime ?? (startTime + (next.duration || 0)));
     await this.executeQuery(
       `UPDATE production_scenes SET
         position = ?, label = ?, script_text = ?, prompt = ?, duration = ?,
@@ -1332,10 +1349,11 @@ class Database {
         model = ?, external_task_id = ?, status = ?, narration_status = ?, revision = ?,
         locked = ?, rights_confirmed = ?, provenance_source_ids = ?,
         contains_synthetic_media = ?, estimated_cost = ?, actual_cost = ?,
+        caption_mapping = ?, start_time = ?, end_time = ?,
         updated_at = datetime('now')
        WHERE production_id = ? AND id = ?`,
       [
-        next.position, next.label, next.scriptText || '', next.prompt || '', next.duration,
+        next.position, next.label, scriptText, prompt, next.duration,
         next.assetType || 'missing', next.assetOrigin || 'generated', next.assetPath || null,
         next.audioPath || null, next.narrationProvider || null, next.narrationModel || null,
         next.narrationTaskId || null, next.narrationError || null, next.narrationGeneratedAt || null,
@@ -1344,6 +1362,7 @@ class Database {
         next.locked ? 1 : 0, next.rightsConfirmed ? 1 : 0,
         JSON.stringify(next.provenanceSourceIds || []), next.containsSyntheticMedia ? 1 : 0,
         JSON.stringify(next.estimatedCost || {}), JSON.stringify(next.actualCost || {}),
+        captionMapping, startTime, endTime,
         productionId, sceneId
       ]
     );
@@ -1400,11 +1419,25 @@ class Database {
 
   parseProductionScene(row) {
     if (!row) return null;
+    let captionMapping = [];
+    try {
+      captionMapping = JSON.parse(row.caption_mapping || '[]');
+    } catch (_e) {}
+    const duration = Number(row.duration);
+    const startTime = row.start_time !== undefined && row.start_time !== null ? Number(row.start_time) : undefined;
+    const endTime = row.end_time !== undefined && row.end_time !== null ? Number(row.end_time) : (startTime !== undefined ? startTime + duration : undefined);
     return {
       ...row,
       position: Number(row.position),
-      duration: Number(row.duration),
+      duration,
+      startTime,
+      endTime,
       scriptText: row.script_text || '',
+      narration: row.script_text || '',
+      prompt: row.prompt || '',
+      visual_prompt: row.prompt || '',
+      captionMapping,
+      captions: captionMapping,
       assetType: row.asset_type || 'missing',
       assetOrigin: row.asset_origin || 'generated',
       assetPath: row.asset_path || null,

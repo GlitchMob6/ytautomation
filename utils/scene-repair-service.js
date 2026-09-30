@@ -17,6 +17,21 @@ function textFromSection(section = {}) {
 }
 
 function scriptScenes(script = {}) {
+  // --- Canonical structured format (script.scenes[]) ---
+  // Each scene has: index, narration, visual_prompt, purpose, audioDuration
+  if (Array.isArray(script.scenes) && script.scenes.length > 0) {
+    return script.scenes.map((scene, idx) => ({
+      label: scene.purpose || `Scene ${scene.index || idx + 1}`,
+      scriptText: scene.narration || '',
+      narration: scene.narration || '',
+      prompt: scene.visual_prompt || scene.narration || '',
+      visual_prompt: scene.visual_prompt || scene.narration || '',
+      audioDuration: scene.audioDuration || null,
+      index: scene.index || idx + 1
+    }));
+  }
+
+  // --- Legacy schema fallback (hook/introduction/mainContent/conclusion/callToAction) ---
   const scenes = [];
   if (script.hook?.text || script.title) {
     scenes.push({
@@ -72,10 +87,33 @@ function durationSeconds(value, fallback = 60) {
   return fallback;
 }
 
+function buildSceneCaptions(narration = '', startTime = 0, duration = 0) {
+  if (!narration || !duration) return [];
+  const words = narration.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const wordsPerCaption = 8;
+  const numChunks = Math.ceil(words.length / wordsPerCaption) || 1;
+  const chunkDuration = duration / numChunks;
+  const chunks = [];
+  for (let c = 0; c < numChunks; c++) {
+    const i = c * wordsPerCaption;
+    const captionWords = words.slice(i, i + wordsPerCaption);
+    const captionStart = startTime + c * chunkDuration;
+    const captionEnd = captionStart + chunkDuration;
+    chunks.push({
+      index: c + 1,
+      startTime: Number(captionStart.toFixed(2)),
+      endTime: Number(captionEnd.toFixed(2)),
+      text: captionWords.join(' ')
+    });
+  }
+  return chunks;
+}
+
 function buildInitialSceneManifest(production = {}, providerResult = {}) {
   const blueprints = scriptScenes(production.script || {});
   const totalDuration = durationSeconds(production.estimatedDuration || production.assets?.finalVideo?.duration, Math.max(30, blueprints.length * 8));
-  const wordCounts = blueprints.map(scene => Math.max(8, scene.scriptText.trim().split(/\s+/).filter(Boolean).length));
+  const wordCounts = blueprints.map(scene => Math.max(8, (scene.scriptText || scene.narration || '').trim().split(/\s+/).filter(Boolean).length));
   const totalWords = wordCounts.reduce((sum, count) => sum + count, 0);
   const generated = providerResult.scenes || [];
   const visualAssets = (production.assets?.video?.visualAssets || []).filter(Boolean);
@@ -84,6 +122,7 @@ function buildInitialSceneManifest(production = {}, providerResult = {}) {
     ? 'intentional_silence'
     : audio.simulated || audio.status === 'unavailable' ? 'unavailable' : 'current';
 
+  let runningTime = 0;
   return blueprints.map((scene, position) => {
     const generatedScene = generated.find(item => String(item.label || '').toLowerCase() === scene.label.toLowerCase()) || generated[position];
     const imageAsset = visualAssets[position % Math.max(1, visualAssets.length)] || null;
@@ -91,11 +130,34 @@ function buildInitialSceneManifest(production = {}, providerResult = {}) {
     const assetPath = generatedScene?.path || (isImageObj ? imageAsset.path : imageAsset);
     const assetType = generatedScene?.path ? 'video' : imageAsset ? 'image' : 'missing';
     const provider = generatedScene?.provider || (assetType === 'image' ? (isImageObj && imageAsset.provider ? imageAsset.provider : 'image-provider') : providerResult.actualProvider || 'slideshow');
+    
+    // Use actual audioDuration from structured scenes when available, otherwise prorate by word count
+    const duration = scene.audioDuration
+      ? Math.max(1, Number(scene.audioDuration.toFixed(2)))
+      : Math.max(2, Number(((wordCounts[position] / totalWords) * totalDuration).toFixed(2)));
+
+    const startTime = Number(runningTime.toFixed(2));
+    const endTime = Number((runningTime + duration).toFixed(2));
+    runningTime += duration;
+
+    const narration = scene.narration || scene.scriptText || '';
+    const visualPrompt = scene.visual_prompt || scene.prompt || '';
+    const captionMapping = buildSceneCaptions(narration, startTime, duration);
+
     return {
       id: `scene_${crypto.randomUUID()}`,
       position,
       ...scene,
-      duration: Math.max(2, Number(((wordCounts[position] / totalWords) * totalDuration).toFixed(2))),
+      label: scene.label,
+      narration,
+      scriptText: narration,
+      visual_prompt: visualPrompt,
+      prompt: visualPrompt,
+      duration,
+      startTime,
+      endTime,
+      captionMapping,
+      captions: captionMapping,
       assetType,
       assetOrigin: 'generated',
       assetPath,
@@ -133,7 +195,9 @@ class SceneRepairService {
   }
 
   async ensureManifest(bundle) {
-    if (bundle.scenes?.length) return bundle.scenes;
+    if (bundle.scenes?.length && (!bundle.script?.scenes?.length || bundle.scenes.length >= bundle.script.scenes.length)) {
+      return bundle.scenes;
+    }
     const scenes = buildInitialSceneManifest(bundle, bundle.assets?.finalVideo?.provider || {});
     await this.initializeAudioSegments(bundle, scenes);
     return this.db.replaceProductionScenes(bundle.id, scenes);
@@ -150,17 +214,34 @@ class SceneRepairService {
   async initializeAudioSegments(production, scenes) {
     const audioPath = production.assets?.audio?.path;
     const audio = production.assets?.audio || {};
-    if (!await this.videoGenerator?.isUsableAudioFile?.(audioPath)) {
-      for (const scene of scenes) {
-        scene.narrationStatus = audio.intentionalSilence === true ? 'intentional_silence' : 'unavailable';
-        scene.narrationError = audio.intentionalSilence === true ? null : audio.error || 'Narration audio is unavailable';
-      }
-      return scenes;
-    }
+    const audioDir = audioPath ? path.dirname(audioPath) : path.join(this.dataRoot, 'audio');
     const directory = path.join(this.dataRoot, 'audio', 'scenes', production.id);
     await fs.mkdir(directory, { recursive: true });
+
     let start = 0;
     for (const scene of scenes) {
+      // Check if per-scene audio was pre-generated by generateAudioNarration
+      const perSceneAudio = path.join(audioDir, `${production.id}_scene_${scene.index || scene.position + 1}.mp3`);
+      if (await this.videoGenerator?.isUsableAudioFile?.(perSceneAudio)) {
+        scene.audioPath = perSceneAudio;
+        scene.narrationStatus = 'current';
+        scene.narrationProvider = audio.provider || null;
+        scene.narrationModel = audio.model || null;
+        scene.narrationTaskId = audio.externalTaskId || null;
+        scene.narrationError = null;
+        scene.narrationGeneratedAt = audio.generatedAt || null;
+        scene.narrationCost = audio.cost || {};
+        start += Number(scene.duration);
+        continue;
+      }
+
+      if (!await this.videoGenerator?.isUsableAudioFile?.(audioPath)) {
+        scene.narrationStatus = audio.intentionalSilence === true ? 'intentional_silence' : 'unavailable';
+        scene.narrationError = audio.intentionalSilence === true ? null : audio.error || 'Narration audio is unavailable';
+        start += Number(scene.duration);
+        continue;
+      }
+
       const output = path.join(directory, `${String(scene.position).padStart(3, '0')}_r1.mp3`);
       try {
         await runFFmpeg(['-y', '-ss', start.toFixed(2), '-t', Number(scene.duration).toFixed(2), '-i', audioPath, '-vn', '-c:a', 'libmp3lame', output]);

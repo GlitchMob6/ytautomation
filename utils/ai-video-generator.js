@@ -358,10 +358,11 @@ class AIVideoGenerator {
     const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.webp']);
     const images = [];
     for (const asset of visualAssets) {
-      if (typeof asset !== 'string' || !imageExtensions.has(path.extname(asset).toLowerCase())) continue;
+      const assetPath = typeof asset === 'string' ? asset : (asset && typeof asset === 'object' ? asset.path : null);
+      if (!assetPath || typeof assetPath !== 'string' || !imageExtensions.has(path.extname(assetPath).toLowerCase())) continue;
       try {
-        await fs.access(asset);
-        images.push(asset);
+        await fs.access(assetPath);
+        images.push(assetPath);
       } catch (_error) { /* ignore missing assets */ }
     }
     return images;
@@ -506,12 +507,13 @@ class AIVideoGenerator {
     const images = [];
 
     for (const asset of visualAssets) {
-      if (typeof asset !== 'string' || !imageExtensions.has(path.extname(asset).toLowerCase())) {
+      const assetPath = typeof asset === 'string' ? asset : (asset && typeof asset === 'object' ? asset.path : null);
+      if (!assetPath || typeof assetPath !== 'string' || !imageExtensions.has(path.extname(assetPath).toLowerCase())) {
         continue;
       }
 
       try {
-        const imageBuffer = await fs.readFile(asset);
+        const imageBuffer = await fs.readFile(assetPath);
         const metadata = await sharp(imageBuffer, { failOn: 'error' }).metadata();
         const mimeType = mimeTypes[metadata.format];
         if (mimeType && metadata.width && metadata.height) {
@@ -673,14 +675,14 @@ class AIVideoGenerator {
     
     if (script.scenes) {
       script.scenes.forEach((scene, index) => {
-        const assetIndex = Math.min(index + 1, visualAssets.length - 1);
+        const assetIndex = index < visualAssets.length ? index : Math.min(index, visualAssets.length - 1);
         
         slides.push(`
         <div class="slide">
             ${visualAssets[assetIndex] ? `<img class="background-image" src="${visualAssets[assetIndex]}" />` : ''}
             <div class="content">
-                <h2>${scene.purpose}</h2>
-                <p>${scene.narration.slice(0, 150)}${scene.narration.length > 150 ? '...' : ''}</p>
+                <h2>${scene.purpose || `Scene ${index + 1}`}</h2>
+                <p>${(scene.narration || '').slice(0, 150)}${(scene.narration || '').length > 150 ? '...' : ''}</p>
             </div>
         </div>`);
       });

@@ -1,4 +1,4 @@
-const ui = {
+caonst ui = {
   state: null,
   currentView: 'overview',
   refreshing: false,
@@ -95,8 +95,8 @@ function renderFriendlyError(errorText, context = 'A process') {
   if (!errorText) return '';
   const safeText = escapeHTML(String(errorText));
   const encoded = encodeURIComponent(String(errorText));
-  const copyJs = `navigator.clipboard.writeText('Please fix this error in Spud Wrench: ' + decodeURIComponent('${encoded}')); showToast('Error copied! Paste it to your Antigravity AI assistant to fix it.', 'success');`;
-  
+  const copyJs = `navigator.clipboard.writeText('Please fix this error in Lumen Content Studio: ' + decodeURIComponent('${encoded}')); showToast('Error copied! Paste it to your Antigravity AI assistant to fix it.', 'success');`;
+
   return `<div style="background: rgba(255, 77, 94, 0.1); border-left: 4px solid #ff4d5e; padding: 12px 16px; margin: 12px 0; border-radius: 4px;">
     <h4 style="margin: 0 0 4px 0; color: #ff4d5e; display: flex; align-items: center; gap: 8px;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
@@ -433,7 +433,7 @@ function renderLearning(learning = {}) {
           ${item.status !== 'rejected' ? `<button class="text-button" data-learning-action="reject" data-learning-id="${escapeHTML(item.id)}">Reject</button>` : ''}
         </span>
       </div>
-    </article>`).join('') : empty('No recommendation yet. Spud Wrench needs at least two real, sufficiently exposed measurements.');
+    </article>`).join('') : empty('No recommendation yet. Lumen needs at least two real, sufficiently exposed measurements.');
 }
 
 function renderGrowthExperiments(summary = {}) {
@@ -701,7 +701,7 @@ function renderActivation(activation = {}) {
   if (milestones.firstRealVideo?.achieved) {
     container.insertAdjacentHTML('beforeend', `
       <div class="activation-share">
-        <span>Made something real with Spud Wrench?</span>
+        <span>Made something real with Lumen?</span>
         <a class="button secondary small" href="https://github.com/darkzOGx/youtube-automation-agent/discussions/new?category=show-and-tell" target="_blank" rel="noreferrer">Share what you built</a>
       </div>`);
   }
@@ -814,7 +814,7 @@ function switchView(view) {
   $$('.view').forEach(item => item.classList.toggle('active', item.id === `${view}-view`));
   const titles = {
     overview: ['OPERATOR OVERVIEW', 'Know what happens next.'],
-    operator: ['AUTONOMOUS OPERATOR', 'Give Spud Wrench the strategy.'],
+    operator: ['AUTONOMOUS OPERATOR', 'Give Lumen the strategy.'],
     pipeline: ['CONTENT OPERATIONS', 'From idea to published.'],
     calendar: ['EDITORIAL PLANNING', 'Plan before you generate.'],
     analytics: ['PERFORMANCE', 'Turn results into the next move.'],
@@ -841,11 +841,11 @@ function renderSourceEditor(source = {}, disabled = false) {
       <label><span>Title</span><input data-field="title" value="${escapeHTML(source.title || '')}" maxlength="300" ${disabled ? 'disabled' : ''}></label>
       <label><span>Publisher</span><input data-field="publisher" value="${escapeHTML(source.publisher || '')}" maxlength="200" ${disabled ? 'disabled' : ''}></label>
       <label><span>Type</span><select data-field="sourceType" ${disabled ? 'disabled' : ''}>${selectOptions([
-        ['official', 'Official source'], ['article', 'Article'], ['video', 'Video'], ['dataset', 'Dataset'], ['asset', 'Asset or license'], ['other', 'Other']
-      ], source.sourceType || 'other')}</select></label>
+    ['official', 'Official source'], ['article', 'Article'], ['video', 'Video'], ['dataset', 'Dataset'], ['asset', 'Asset or license'], ['other', 'Other']
+  ], source.sourceType || 'other')}</select></label>
       <label><span>Review status</span><select data-field="status" ${disabled ? 'disabled' : ''}>${selectOptions([
-        ['pending', 'Pending review'], ['verified', 'Verified'], ['rejected', 'Rejected']
-      ], source.status || 'pending')}</select></label>
+    ['pending', 'Pending review'], ['verified', 'Verified'], ['rejected', 'Rejected']
+  ], source.status || 'pending')}</select></label>
     </div>
     <label><span>Evidence notes</span><textarea data-field="notes" rows="2" maxlength="1000" ${disabled ? 'disabled' : ''}>${escapeHTML(source.notes || '')}</textarea></label>
     ${source.url ? `<a class="source-link" href="${escapeHTML(source.url)}" target="_blank" rel="noopener">Open source ↗</a>` : ''}
@@ -859,11 +859,11 @@ function renderClaimEditor(claim = {}, sources = [], disabled = false) {
     <label><span>Claim</span><textarea data-field="text" rows="3" maxlength="1000" required ${disabled ? 'disabled' : ''}>${escapeHTML(claim.text || '')}</textarea></label>
     <div class="form-grid two">
       <label><span>Risk</span><select data-field="riskLevel" ${disabled ? 'disabled' : ''}>${selectOptions([
-        ['standard', 'Standard'], ['high', 'High risk']
-      ], claim.riskLevel || 'standard')}</select></label>
+    ['standard', 'Standard'], ['high', 'High risk']
+  ], claim.riskLevel || 'standard')}</select></label>
       <label><span>Resolution</span><select data-field="status" ${disabled ? 'disabled' : ''}>${selectOptions([
-        ['pending', 'Pending'], ['supported', 'Supported'], ['unsupported', 'Unsupported'], ['waived', 'Waived with note']
-      ], claim.status || 'pending')}</select></label>
+    ['pending', 'Pending'], ['supported', 'Supported'], ['unsupported', 'Unsupported'], ['waived', 'Waived with note']
+  ], claim.status || 'pending')}</select></label>
     </div>
     <fieldset class="source-checklist" ${disabled ? 'disabled' : ''}><legend>Supporting sources</legend>
       ${sources.length ? sources.map(source => `<label><input type="checkbox" data-claim-source="${escapeHTML(source.id)}" ${linked.has(source.id) ? 'checked' : ''}> ${escapeHTML(source.title || source.url)}</label>`).join('') : '<small>Add a source before marking this claim supported.</small>'}
@@ -900,15 +900,15 @@ function renderDiscoverabilityPanel(item) {
     </div>
     ${audit?.error ? renderFriendlyError(audit.error, 'The SEO audit') : ''}
     ${findings.length ? `<div class="discoverability-findings">${findings.map(finding => {
-      const reviewStatus = finding.reviewStatus || finding.review_status || 'pending';
-      return `<article class="discoverability-finding severity-${escapeHTML(String(finding.severity || 'info').toLowerCase())}" data-discoverability-finding="${escapeHTML(finding.id)}">
+    const reviewStatus = finding.reviewStatus || finding.review_status || 'pending';
+    return `<article class="discoverability-finding severity-${escapeHTML(String(finding.severity || 'info').toLowerCase())}" data-discoverability-finding="${escapeHTML(finding.id)}">
         <div class="discoverability-finding-heading"><span class="severity-badge">${escapeHTML(finding.severity)}</span><strong>${escapeHTML(finding.ruleId || finding.rule_id)}</strong><span class="review-state ${escapeHTML(reviewStatus)}">${escapeHTML(label(reviewStatus))}</span></div>
         <p>${escapeHTML(finding.message)}</p>
         ${finding.remediation ? `<small>${escapeHTML(finding.remediation)}</small>` : ''}
         ${finding.reviewReason || finding.review_reason ? `<small>Reviewer note: ${escapeHTML(finding.reviewReason || finding.review_reason)}</small>` : ''}
         <div class="discoverability-review-actions"><button type="button" class="text-button approve" data-discoverability-accept ${reviewStatus === 'accepted' ? 'disabled' : ''}>Keep as actionable</button><button type="button" class="text-button" data-discoverability-dismiss ${reviewStatus === 'dismissed' ? 'disabled' : ''}>Dismiss false positive</button></div>
       </article>`;
-    }).join('')}</div>` : audit && audit.status !== 'unavailable' ? '<p class="empty-inline">No discoverability findings. The content package passed the configured advisory checks.</p>' : '<p class="empty-inline">Run DarkzSEO to create a versioned, reviewable audit for this production.</p>'}
+  }).join('')}</div>` : audit && audit.status !== 'unavailable' ? '<p class="empty-inline">No discoverability findings. The content package passed the configured advisory checks.</p>' : '<p class="empty-inline">Run DarkzSEO to create a versioned, reviewable audit for this production.</p>'}
   </section>`;
 }
 
@@ -929,8 +929,8 @@ function renderSceneEditor(item, canReview = true) {
       <p>${intentionalSilence ? escapeHTML(audio.silenceReason || '') : audio.error ? escapeHTML(audio.error) : 'Regenerate narration without replacing the scene visual. Approval remains blocked until audio is ready.'}</p>
       ${audio.provider ? `<span class="narration-evidence">${escapeHTML(audio.provider)}${audio.model ? ` · ${escapeHTML(audio.model)}` : ''}${audio.externalTaskId ? ` · task ${escapeHTML(audio.externalTaskId)}` : ''}</span>` : ''}</div>
       ${canReview ? intentionalSilence
-        ? '<button type="button" class="button secondary small" data-require-narration>Require narration</button>'
-        : '<button type="button" class="button secondary small" data-intentional-silence>Use intentional silence</button>' : ''}
+      ? '<button type="button" class="button secondary small" data-require-narration>Require narration</button>'
+      : '<button type="button" class="button secondary small" data-intentional-silence>Use intentional silence</button>' : ''}
     </div>
     <div class="scene-summary"><strong>${scenes.length} scenes</strong><span>${Math.round(scenes.reduce((sum, scene) => sum + Number(scene.duration || 0), 0))}s timeline</span><span>${scenes.filter(scene => scene.status !== 'ready').length} pending repairs</span></div>
     <div class="scene-list">
@@ -990,12 +990,12 @@ function renderShortsStudio(item) {
       <span>Local render · no new provider call</span>
     </div>
     ${clips.length ? `<div class="shorts-grid">${clips.map(clip => {
-      const locked = ['scheduled', 'uploading', 'published', 'reconciliation_required'].includes(clip.status);
-      const rendered = Boolean(clip.assetUrls?.video);
-      return `<article class="short-card" data-short-card="${escapeHTML(clip.id)}">
+    const locked = ['scheduled', 'uploading', 'published', 'reconciliation_required'].includes(clip.status);
+    const rendered = Boolean(clip.assetUrls?.video);
+    return `<article class="short-card" data-short-card="${escapeHTML(clip.id)}">
         <div class="short-preview">${rendered
-          ? `<video controls preload="metadata"><source src="${escapeHTML(clip.assetUrls.video)}" type="video/mp4"></video>`
-          : `<div class="short-placeholder"><strong>9:16</strong><span>${escapeHTML(label(clip.layout))} layout</span></div>`}</div>
+        ? `<video controls preload="metadata"><source src="${escapeHTML(clip.assetUrls.video)}" type="video/mp4"></video>`
+        : `<div class="short-placeholder"><strong>9:16</strong><span>${escapeHTML(label(clip.layout))} layout</span></div>`}</div>
         <div class="short-editor">
           <div class="scene-status-row">${statusChip(clip.status)}<span>${Number(clip.duration || 0).toFixed(0)}s</span><span>${escapeHTML((clip.sourceSceneLabels || []).join(' + '))}</span></div>
           <label><span>Short title</span><input data-short-field="title" maxlength="100" value="${escapeHTML(clip.title)}" ${locked ? 'disabled' : ''}></label>
@@ -1012,7 +1012,7 @@ function renderShortsStudio(item) {
           ${!locked ? `<div class="short-actions"><button type="button" class="text-button" data-short-save>Save draft</button><button type="button" class="button secondary small" data-short-render>${rendered ? 'Render again' : 'Render 9:16'}</button><button type="button" class="button primary small" data-short-approve ${!parentApproved || clip.status !== 'rendered' ? 'disabled' : ''} title="${!parentApproved ? 'Approve the source production first' : clip.status !== 'rendered' ? 'Render this Short first' : 'Confirm and schedule this Short'}">Approve &amp; schedule</button></div>` : ''}
         </div>
       </article>`;
-    }).join('')}</div>` : '<p class="empty-inline">No Short drafts yet. Create three candidates from the current scene timeline without calling a paid provider.</p>'}
+  }).join('')}</div>` : '<p class="empty-inline">No Short drafts yet. Create three candidates from the current scene timeline without calling a paid provider.</p>'}
   </section>`;
 }
 
@@ -1238,12 +1238,12 @@ document.addEventListener('click', async event => {
 
   const cancel = event.target.closest('[data-cancel-job]');
   if (cancel && confirm('Cancel this generation job after its current stage?')) {
-    await mutate(`/api/jobs/${encodeURIComponent(cancel.dataset.cancelJob)}/cancel`, 'POST', {}, 'Cancellation requested.').catch(() => {});
+    await mutate(`/api/jobs/${encodeURIComponent(cancel.dataset.cancelJob)}/cancel`, 'POST', {}, 'Cancellation requested.').catch(() => { });
   }
 
   const idea = event.target.closest('[data-generate-idea]');
   if (idea) {
-    await mutate(`/api/ideas/${encodeURIComponent(idea.dataset.generateIdea)}/generate`, 'POST', { length: 'medium' }, 'Idea queued for generation.').catch(() => {});
+    await mutate(`/api/ideas/${encodeURIComponent(idea.dataset.generateIdea)}/generate`, 'POST', { length: 'medium' }, 'Idea queued for generation.').catch(() => { });
   }
 
   const resume = event.target.closest('[data-resume-job]');
@@ -1252,7 +1252,7 @@ document.addEventListener('click', async event => {
     const select = $$('[data-resume-stage-for]').find(item => item.dataset.resumeStageFor === jobId);
     const stage = select?.value;
     if (confirm(`Resume this job from ${label(stage)}? Later checkpoints will be regenerated.`)) {
-      await mutate(`/api/jobs/${encodeURIComponent(jobId)}/resume`, 'POST', { stage }, `Generation resumed from ${label(stage)}.`).catch(() => {});
+      await mutate(`/api/jobs/${encodeURIComponent(jobId)}/resume`, 'POST', { stage }, `Generation resumed from ${label(stage)}.`).catch(() => { });
     }
   }
 
@@ -1263,7 +1263,7 @@ document.addEventListener('click', async event => {
     const message = action === 'approve'
       ? 'Learning approved for future autonomous plans.'
       : 'Learning rejected and excluded from future plans.';
-    await mutate(`/api/learning/recommendations/${encodeURIComponent(id)}/${action}`, 'POST', {}, message).catch(() => {});
+    await mutate(`/api/learning/recommendations/${encodeURIComponent(id)}/${action}`, 'POST', {}, message).catch(() => { });
   }
 
   const experiment = event.target.closest('[data-experiment-action]');
@@ -1272,7 +1272,7 @@ document.addEventListener('click', async event => {
     const id = experiment.dataset.experimentId;
     const prompts = {
       approve: 'Approve this complete experiment plan? This does not change YouTube yet.',
-      start: 'Start this live test? Spud Wrench will rotate only the approved arms and restore the control before asking you to adopt a winner.',
+      start: 'Start this live test? Lumen will rotate only the approved arms and restore the control before asking you to adopt a winner.',
       adopt: 'Adopt the evidence-backed winner on YouTube and approve its learning for future plans?',
       cancel: 'Cancel this experiment and restore the control title and thumbnail?'
     };
@@ -1284,7 +1284,7 @@ document.addEventListener('click', async event => {
       adopt: 'Winner adopted and approved for future planning.',
       cancel: 'Experiment cancelled and control restored.'
     };
-    await mutate(`/api/experiments/${encodeURIComponent(id)}/${action}`, 'POST', prompts[action] ? { confirmed: true } : {}, messages[action]).catch(() => {});
+    await mutate(`/api/experiments/${encodeURIComponent(id)}/${action}`, 'POST', prompts[action] ? { confirmed: true } : {}, messages[action]).catch(() => { });
   }
 
   const refreshRetention = event.target.closest('#refresh-retention-button');
@@ -1332,14 +1332,14 @@ document.addEventListener('click', async event => {
   if (replySave) {
     const card = replySave.closest('[data-reply-card]');
     const text = card?.querySelector('[data-reply-text]')?.value || '';
-    await mutate(`/api/engagement/replies/${encodeURIComponent(replySave.dataset.replySave)}`, 'PATCH', { editedText: text }, 'Reply draft updated.').catch(() => {});
+    await mutate(`/api/engagement/replies/${encodeURIComponent(replySave.dataset.replySave)}`, 'PATCH', { editedText: text }, 'Reply draft updated.').catch(() => { });
     ui.engagementDetail = null;
     renderEngagement(ui.state?.engagement || {});
   }
 
   const replyDiscard = event.target.closest('[data-reply-discard]');
   if (replyDiscard) {
-    await mutate(`/api/engagement/replies/${encodeURIComponent(replyDiscard.dataset.replyDiscard)}`, 'PATCH', { discard: true }, 'Reply draft discarded.').catch(() => {});
+    await mutate(`/api/engagement/replies/${encodeURIComponent(replyDiscard.dataset.replyDiscard)}`, 'PATCH', { discard: true }, 'Reply draft discarded.').catch(() => { });
     ui.engagementDetail = null;
     renderEngagement(ui.state?.engagement || {});
   }
@@ -1350,7 +1350,7 @@ document.addEventListener('click', async event => {
     const text = card?.querySelector('[data-reply-text]')?.value || '';
     if (!text.trim()) return showToast('Reply text is empty.', 'error');
     if (confirm(`Post this reply to YouTube?\n\n${text}`)) {
-      await mutate(`/api/engagement/replies/${encodeURIComponent(replyApprove.dataset.replyApprove)}/approve`, 'POST', { confirmed: true, editedText: text }, 'Reply posted to YouTube.').catch(() => {});
+      await mutate(`/api/engagement/replies/${encodeURIComponent(replyApprove.dataset.replyApprove)}/approve`, 'POST', { confirmed: true, editedText: text }, 'Reply posted to YouTube.').catch(() => { });
       ui.engagementDetail = null;
       renderEngagement(ui.state?.engagement || {});
     }
@@ -1560,7 +1560,7 @@ document.addEventListener('click', async event => {
   const saveProvenance = event.target.closest('[data-save-provenance]');
   if (saveProvenance) {
     const productionId = $('#content-review-form')?.dataset.productionId;
-    if (productionId) await persistProvenance(productionId, 'Evidence review saved.').catch(() => {});
+    if (productionId) await persistProvenance(productionId, 'Evidence review saved.').catch(() => { });
     return;
   }
 
@@ -1616,14 +1616,14 @@ document.addEventListener('click', async event => {
   if (reject) {
     const notes = prompt('Why are you rejecting this content?', 'Needs a different angle');
     if (notes !== null) {
-      await mutate(`/api/content/${encodeURIComponent(reject.dataset.rejectContent)}/reject`, 'POST', { notes }, 'Content rejected.').catch(() => {});
+      await mutate(`/api/content/${encodeURIComponent(reject.dataset.rejectContent)}/reject`, 'POST', { notes }, 'Content rejected.').catch(() => { });
       $('#content-dialog').close();
     }
   }
 
   const retry = event.target.closest('[data-retry-content]');
   if (retry && confirm('Generate a fresh version using the same topic?')) {
-    await mutate(`/api/content/${encodeURIComponent(retry.dataset.retryContent)}/retry`, 'POST', {}, 'Regeneration started.').catch(() => {});
+    await mutate(`/api/content/${encodeURIComponent(retry.dataset.retryContent)}/retry`, 'POST', {}, 'Regeneration started.').catch(() => { });
     $('#content-dialog').close();
   }
 });
@@ -1665,7 +1665,7 @@ $('#experiment-create-form').addEventListener('submit', async event => {
     productionId: values.productionId,
     armDurationHours: Number(values.armDurationHours),
     minImpressions: Number(values.minImpressions)
-  }, 'Draft growth experiment created for review.').catch(() => {});
+  }, 'Draft growth experiment created for review.').catch(() => { });
 });
 
 $('#run-readiness-button').addEventListener('click', async event => {
@@ -1687,7 +1687,7 @@ $('#run-readiness-button').addEventListener('click', async event => {
 
 $('#automation-toggle').addEventListener('click', async () => {
   const action = ui.state?.system.automationPaused ? 'resume' : 'pause';
-  await mutate(`/api/automation/${action}`, 'POST', {}, `Automation ${action}d.`).catch(() => {});
+  await mutate(`/api/automation/${action}`, 'POST', {}, `Automation ${action}d.`).catch(() => { });
 });
 
 function strategyFormData(status = ui.state?.channelStrategy?.status || 'draft') {
@@ -1707,29 +1707,29 @@ function strategyFormData(status = ui.state?.channelStrategy?.status || 'draft')
 
 $('#strategy-form').addEventListener('submit', async event => {
   event.preventDefault();
-  await mutate('/api/operator/strategy', 'PUT', strategyFormData(), 'Channel strategy saved.').catch(() => {});
+  await mutate('/api/operator/strategy', 'PUT', strategyFormData(), 'Channel strategy saved.').catch(() => { });
 });
 
 $('#activate-operator-button').addEventListener('click', async () => {
   if (!$('#strategy-form').reportValidity()) return;
-  await mutate('/api/operator/start', 'POST', strategyFormData('active'), 'Autonomous operator started.').catch(() => {});
+  await mutate('/api/operator/start', 'POST', strategyFormData('active'), 'Autonomous operator started.').catch(() => { });
 });
 
 $('#pause-operator-button').addEventListener('click', async () => {
-  await mutate('/api/operator/pause', 'POST', {}, 'Autonomous operator paused.').catch(() => {});
+  await mutate('/api/operator/pause', 'POST', {}, 'Autonomous operator paused.').catch(() => { });
 });
 
 $('#cancel-operator-run').addEventListener('click', async event => {
   const runId = event.currentTarget.dataset.runId;
   if (runId && confirm('Stop this autonomous run after the current agent stage?')) {
-    await mutate(`/api/operator/runs/${encodeURIComponent(runId)}/cancel`, 'POST', {}, 'Operator stop requested.').catch(() => {});
+    await mutate(`/api/operator/runs/${encodeURIComponent(runId)}/cancel`, 'POST', {}, 'Operator stop requested.').catch(() => { });
   }
 });
 
 $('#resume-operator-run').addEventListener('click', async event => {
   const runId = event.currentTarget.dataset.runId;
   if (runId && confirm('Resume this operator run from its saved editorial plan and generation checkpoints?')) {
-    await mutate(`/api/operator/runs/${encodeURIComponent(runId)}/resume`, 'POST', {}, 'Autonomous operator resumed.').catch(() => {});
+    await mutate(`/api/operator/runs/${encodeURIComponent(runId)}/resume`, 'POST', {}, 'Autonomous operator resumed.').catch(() => { });
   }
 });
 
@@ -1792,7 +1792,7 @@ window.app = {
       });
       const source = await srcRes.json();
       if (source.error) throw new Error(source.error);
-      
+
       const jobRes = await fetch('/api/remix/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1800,7 +1800,7 @@ window.app = {
       });
       const job = await jobRes.json();
       if (job.error) throw new Error(job.error);
-      
+
       fetchRemixJobs();
     } catch (e) {
       alert(`Error starting remix: ${e.message}`);
@@ -1825,7 +1825,7 @@ function renderRemixJobs(jobs = []) {
     container.innerHTML = `<div class="empty-state">No remix jobs yet</div>`;
     return;
   }
-  
+
   container.innerHTML = jobs.map(job => `
     <div class="job-item">
       <div>
