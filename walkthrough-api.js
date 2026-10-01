@@ -212,6 +212,8 @@ function mountWalkthroughAPI(app) {
           channelName: channelName || 'My Content Studio',
           targetAudience: targetAudience || 'General audience interested in educational content'
         });
+        await db.setSetting('setup_completed', 'true');
+        await db.setSetting('setup_completed_at', new Date().toISOString());
       } catch (e) {
         // ignore
       }
@@ -256,6 +258,23 @@ function mountWalkthroughAPI(app) {
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ── Capabilities state ───────────────────────────────────────────────
+  app.get('/api/walkthrough/capabilities', async (_req, res) => {
+    try {
+      await cm.loadCredentials();
+      const aiTextService = new AITextService(cm.credentials);
+      await aiTextService.initialize(cm.credentials);
+      const summary = aiTextService.router.readiness.getSummary();
+      res.json({
+        success: true,
+        summary,
+        detailed: aiTextService.router.readiness.capabilities
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 }

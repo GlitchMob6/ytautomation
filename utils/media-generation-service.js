@@ -37,23 +37,32 @@ class MediaGenerationService {
 
   buildScenePlan(script = {}, visualAssets = [], settings = {}) {
     const prompts = [];
-    if (script.hook?.text || script.title) {
-      prompts.push({
-        label: 'Hook',
-        prompt: `${script.hook?.text || script.title}. Cinematic opening shot, clear subject, intentional camera movement, no captions or on-screen text.`
-      });
-    }
-    for (const section of script.mainContent?.sections || []) {
-      const detail = typeof section.content === 'string'
-        ? section.content
-        : (section.items || section.steps || []).map(item => `${item.title || ''} ${item.description || ''}`).join(' ');
-      prompts.push({
-        label: section.title || 'Scene',
-        prompt: `${section.title || ''}. ${detail}`.trim() + '. Cinematic explanatory B-roll, natural motion, coherent lighting, no captions or on-screen text.'
-      });
-    }
-    if (script.conclusion?.finalThought) {
-      prompts.push({ label: 'Conclusion', prompt: `${script.conclusion.finalThought}. Memorable cinematic closing shot, no captions or on-screen text.` });
+    if (Array.isArray(script.scenes) && script.scenes.length > 0) {
+      for (const scene of script.scenes) {
+        prompts.push({
+          label: scene.purpose || `Scene ${scene.index}`,
+          prompt: scene.visual_prompt || scene.narration || ''
+        });
+      }
+    } else {
+      if (script.hook?.text || script.title) {
+        prompts.push({
+          label: 'Hook',
+          prompt: `${script.hook?.text || script.title}. Cinematic opening shot, clear subject, intentional camera movement, no captions or on-screen text.`
+        });
+      }
+      for (const section of script.mainContent?.sections || []) {
+        const detail = typeof section.content === 'string'
+          ? section.content
+          : (section.items || section.steps || []).map(item => `${item.title || ''} ${item.description || ''}`).join(' ');
+        prompts.push({
+          label: section.title || 'Scene',
+          prompt: `${section.title || ''}. ${detail}`.trim() + '. Cinematic explanatory B-roll, natural motion, coherent lighting, no captions or on-screen text.'
+        });
+      }
+      if (script.conclusion?.finalThought) {
+        prompts.push({ label: 'Conclusion', prompt: `${script.conclusion.finalThought}. Memorable cinematic closing shot, no captions or on-screen text.` });
+      }
     }
 
     const clipDuration = Number(settings.clipDuration || 8);

@@ -3,76 +3,88 @@ const { GeminiLLMProvider, QwenLocalLLMProvider, OpenAILLMProvider } = require('
 const { GeminiTTSProvider, QwenLocalTTSProvider, KokoroLocalTTSProvider, OpenAITTSProvider, ElevenLabsTTSProvider, FreeTTSProvider } = require('./tts-provider');
 const { GeminiImageProvider, FluxLocalImageProvider, OpenAIImageProvider, FreeImageProvider } = require('./image-provider');
 const { SlideshowVideoProvider } = require('./video-provider');
+const BrowserProvider = require('./browser-provider');
+const { AUTHORITATIVE_PROVIDER_DICTIONARY, ReadinessState } = require('../model-capability-registry');
+const { ProviderHealthStore } = require('./provider-health-store');
 
-function createProviderRouter(credentials, logger) {
+async function createProviderRouter(credentials, logger, db) {
   const router = new ProviderRouter(logger);
+  const readiness = new ReadinessState();
 
-  // Read credentials (assume standard CredentialManager structure)
-  const geminiKey = credentials?.gemini?.apiKey || process.env.GEMINI_API_KEY;
+  // Wire persistent health store if a database instance is available
+  if (db) {
+    const healthStore = new ProviderHealthStore(db, logger);
+    await healthStore.initialize();
+    router.setHealthStore(healthStore);
+  }
 
-  // --- LLM ---
-  // Local first
-  router.registerProvider(new QwenLocalLLMProvider());
-
-  // Hosted OSS
-  const PROVIDERS = {
-    openai: { name: 'OpenAI', baseURL: 'https://api.openai.com/v1', defaultModel: 'gpt-5.6', envKey: 'OPENAI_API_KEY' },
-    openrouter: { name: 'OpenRouter', baseURL: 'https://openrouter.ai/api/v1', defaultModel: 'openai/gpt-5.6-sol', envKey: 'OPENROUTER_API_KEY' },
-    kimi: { name: 'Kimi (Moonshot AI)', baseURL: 'https://api.moonshot.ai/v1', defaultModel: 'kimi-k3', envKey: 'MOONSHOT_API_KEY' },
-    mimo: { name: 'MiMo (Xiaomi)', baseURL: 'https://api.xiaomimimo.com/v1', defaultModel: 'mimo-v2.5-pro', envKey: 'MIMO_API_KEY' },
-    glm: { name: 'GLM (Zhipu AI)', baseURL: 'https://api.z.ai/api/paas/v4/', defaultModel: 'glm-5.3', envKey: 'GLM_API_KEY' }
-  };
-  
-  const providerType = credentials?.aiProvider?.provider;
-  if (providerType === 'ollama' && credentials?.aiProvider?.endpointUrl) {
-    let url = credentials.aiProvider.endpointUrl.replace(/\/$/, '');
-    if (!url.endsWith('/v1')) url += '/v1';
-    router.registerProvider(new QwenLocalLLMProvider(url, credentials.aiProvider.model || 'qwen2.5:9b'));
-  } else if (providerType && PROVIDERS[providerType] && credentials?.aiProvider?.apiKey) {
-    const p = PROVIDERS[providerType];
-    router.registerProvider(new OpenAILLMProvider(providerType, p.name, credentials.aiProvider.apiKey, p.baseURL, credentials.aiProvider.model || p.defaultModel));
-  } else {
-    for (const [id, p] of Object.entries(PROVIDERS)) {
-      const key = process.env[p.envKey];
-      if (key) router.registerProvider(new OpenAILLMProvider(id, p.name, key, p.baseURL, p.defaultModel));
+  // Helper to extract credentials
+  const getCred = (envKey, credPath) => {
+    if (credPath) {
+      const parts = credPath.split('.');
+      let val = credentials;
+      for (const p of parts) val = val?.[p];
+      if (val) return val;
     }
+    return process.env[envKey];
+  };
+
+  // Factory mapping
+  const factory = {
+    'qwen-local': () => {
+      const endpoint = credentials?.aiProvider?.provider === 'ollama' ? credentials.aiProvider.endpointUrl : null;
+      let url = endpoint ? endpoint.replace(/\/$/, '') : null;
+      if (url && !url.endsWith('/v1')) url += '/v1';
+      return new QwenLocalLLMProvider(url, credentials?.aiProvider?.model || 'qwen2.5:9b');
+    },
+    'openai': () => new OpenAILLMProvider('openai', 'OpenAI', getCred('OPENAI_API_KEY', 'aiProvider.apiKey'), 'https://api.openai.com/v1', credentials?.aiProvider?.model || 'gpt-5.6'),
+    'gemini': () => new GeminiLLMProvider(getCred('GEMINI_API_KEY', 'gemini.apiKey'), credentials?.gemini?.model),
+    'pollinations': () => new FreeImageProvider(),
+    'flux-local': () => new FluxLocalImageProvider(),
+    'openai-image': () => new OpenAIImageProvider(getCred('OPENAI_API_KEY', 'openai.apiKey')),
+    'gemini-image': () => new GeminiImageProvider(getCred('GEMINI_API_KEY', 'gemini.apiKey'), process.env.GEMINI_IMAGE_MODEL),
+    'free-tts': () => new FreeTTSProvider(),
+    'openai-tts': () => new OpenAITTSProvider(getCred('OPENAI_API_KEY', 'openai.apiKey')),
+    'gemini-tts': () => new GeminiTTSProvider(getCred('GEMINI_API_KEY', 'gemini.apiKey'), process.env.GEMINI_TTS_MODEL),
+    'ffmpeg-slideshow': () => new SlideshowVideoProvider(),
+    'openai-whisper': () => null, // Stubbed
+    'system-browser': () => new BrowserProvider()
+  };
+
+  const probes = [];
+
+  for (const entry of AUTHORITATIVE_PROVIDER_DICTIONARY) {
+    const creator = factory[entry.id];
+    let providerInstance = null;
+    let probePromise = null;
+
+    if (creator) {
+      try {
+        providerInstance = creator();
+      } catch (err) {
+        // Failed to instantiate
+      }
+    }
+
+    if (providerInstance) {
+      router.registerProvider(providerInstance, entry);
+      readiness.setOptionState(entry, 'probing');
+      probePromise = providerInstance.probe().then(res => {
+        readiness.updateFromProbe(entry, res);
+      });
+    } else {
+      readiness.setOptionState(entry, 'missing', 'Provider implementation missing, credentials absent, or failed to initialize');
+      probePromise = Promise.resolve();
+    }
+    
+    probes.push(probePromise);
   }
 
-  if (geminiKey) {
-    router.registerProvider(new GeminiLLMProvider(geminiKey, credentials?.gemini?.model));
-  }
-
-  // --- TTS ---
-  if (geminiKey) {
-    router.registerProvider(new GeminiTTSProvider(geminiKey, process.env.GEMINI_TTS_MODEL));
-  }
-  const openaiKey = credentials?.openai?.apiKey || process.env.OPENAI_API_KEY;
-  if (openaiKey) {
-    router.registerProvider(new OpenAITTSProvider(openaiKey));
-  }
-  const elevenLabsKey = credentials?.elevenLabs?.apiKey || process.env.ELEVENLABS_API_KEY;
-  const elevenLabsVoiceId = credentials?.elevenLabs?.voiceId || process.env.ELEVENLABS_VOICE_ID;
-  if (elevenLabsKey && elevenLabsVoiceId) {
-    router.registerProvider(new ElevenLabsTTSProvider(elevenLabsKey, elevenLabsVoiceId, process.env.ELEVENLABS_TTS_MODEL));
-  }
-  router.registerProvider(new QwenLocalTTSProvider()); // Stubbed for Phase 4
-  router.registerProvider(new KokoroLocalTTSProvider()); // Stubbed for Phase 4
-  router.registerProvider(new FreeTTSProvider()); // Guaranteed fallback
-
-  // --- Image ---
-  if (geminiKey) {
-    router.registerProvider(new GeminiImageProvider(geminiKey, process.env.GEMINI_IMAGE_MODEL));
-  }
-  if (openaiKey) {
-    router.registerProvider(new OpenAIImageProvider(openaiKey));
-  }
-  router.registerProvider(new FluxLocalImageProvider()); // Stubbed for Phase 4
-  router.registerProvider(new FreeImageProvider()); // Guaranteed fallback
-
-  // --- Video ---
-  router.registerProvider(new SlideshowVideoProvider());
-
+  // Wait for all lightweight probes to complete
+  await Promise.all(probes);
+  
+  router.readiness = readiness;
   return router;
 }
 
-module.exports = { createProviderRouter };
+module.exports = { createProviderRouter, ProviderHealthStore };

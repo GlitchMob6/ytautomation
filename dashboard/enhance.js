@@ -12,8 +12,9 @@
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const MINI_LABELS = {
-    overview: 'Home', operator: 'Operator', pipeline: 'Pipeline',
-    calendar: 'Calendar', analytics: 'Stats', readiness: 'Checks', settings: 'Setup'
+    home: 'Home', overview: 'Home', create: 'Create', projects: 'Projects', pipeline: 'Pipeline',
+    'asset-library': 'Assets', repurpose: 'Repurpose', dna: 'DNA', review: 'Review', export: 'Export', 'model-lab': 'Models',
+    operator: 'Operator', calendar: 'Calendar', analytics: 'Stats', readiness: 'Checks', settings: 'Settings'
   };
   function ensureMiniLabels() {
     $$('.nav-item').forEach(item => {
@@ -30,9 +31,18 @@
 
   /* ---------- 1. View choreography ---------- */
   const VIEW_META = {
+    home: ['HOME', 'Know what happens next.', 'Home'],
+    create: ['CREATE', 'Turn an idea into a real production.', 'Create'],
+    projects: ['PROJECTS', 'Keep every production moving.', 'Projects'],
     overview: ['OPERATOR OVERVIEW', 'Know what happens next.', 'Overview'],
     operator: ['AUTONOMOUS OPERATOR', 'Give Spud Wrench the strategy.', 'Operator'],
     pipeline: ['CONTENT OPERATIONS', 'From idea to published.', 'Pipeline'],
+    'asset-library': ['ASSET LIBRARY', 'Every recorded asset, with provenance.', 'Assets'],
+    repurpose: ['REPURPOSE', 'Make more from approved source media.', 'Repurpose'],
+    dna: ['CHANNEL DNA', 'Keep the creative system consistent.', 'DNA'],
+    review: ['REVIEW', 'Make the human decision before export.', 'Review'],
+    export: ['EXPORT', 'Package approved work without inventing media.', 'Export'],
+    'model-lab': ['MODEL LAB', 'See which capabilities are real and ready.', 'Model Lab'],
     calendar: ['EDITORIAL PLANNING', 'Plan before you generate.', 'Calendar'],
     analytics: ['PERFORMANCE', 'Turn results into the next move.', 'Analytics'],
     readiness: ['PRODUCTION READINESS', 'Verify before autonomy runs.', 'Readiness'],

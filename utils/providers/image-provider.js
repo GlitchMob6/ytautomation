@@ -195,6 +195,7 @@ class OpenAIImageProvider extends BaseProvider {
     return { path: outputPath, provider: this.id };
   }
 }
+let globalImageLock = Promise.resolve();
 
 class FreeImageProvider extends BaseProvider {
   constructor() {
@@ -202,7 +203,6 @@ class FreeImageProvider extends BaseProvider {
   }
 
   async checkAvailability() {
-    // Do a lightweight HEAD check to confirm the API is reachable
     try {
       const res = await axios.head('https://image.pollinations.ai', { timeout: 5000 });
       return res.status < 500;
@@ -213,45 +213,77 @@ class FreeImageProvider extends BaseProvider {
 
   async generate(options) {
     const { prompt, outputPath } = options;
-    // Direct image API endpoint - returns raw image bytes, not a web page
-    // Note: Pollinations free tier limits free direct queries to <= 1280x720 (1080p direct returns 402 Payment Required).
-    // We request 1280x720 and upscale to full 1920x1080 via sharp.
-    const seed = Math.floor(Math.random() * 1000000);
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1280&height=720&nologo=true&seed=${seed}`;
     
+    // Acquire the global lock so only 1 request happens at a time
+    let unlockFn;
+    const lockAcquired = new Promise(r => unlockFn = r);
+    const prevLock = globalImageLock;
+    globalImageLock = prevLock.then(() => lockAcquired);
+    await prevLock;
+
     let buffer;
     let lastError;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const response = await axios.get(url, {
-          responseType: 'arraybuffer',
-          timeout: 60000,
-          headers: { 'Accept': 'image/jpeg,image/png,image/webp,image/*' }
-        });
+    let currentPrompt = prompt;
 
-        // Validate the response is actually an image, not an HTML page
-        const contentType = response.headers['content-type'] || '';
-        if (!contentType.startsWith('image/')) {
-          throw new Error(`Pollinations.ai returned non-image content-type: "${contentType}". The API may have returned an HTML error page.`);
-        }
+    try {
+      for (let attempt = 1; attempt <= 15; attempt++) {
+        try {
+          const seed = Math.floor(Math.random() * 1000000);
+          
+          if (attempt > 1) {
+              currentPrompt = currentPrompt.replace(/cinematic|b-roll|realistic|4k|8k|detailed|high quality/gi, '').trim();
+              if (currentPrompt.length > 50) {
+                  currentPrompt = currentPrompt.substring(0, 50).trim();
+              }
+              if (!currentPrompt) currentPrompt = "A beautiful illustration";
+          }
+          
+          const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(currentPrompt)}?seed=${seed}&nologo=true`;
+          
+          const response = await axios.get(url, {
+            responseType: 'arraybuffer',
+            timeout: 60000,
+            headers: { 
+              'Accept': 'image/jpeg,image/png,image/webp,image/*'
+            }
+          });
 
-        buffer = Buffer.from(response.data);
+          const contentType = response.headers['content-type'] || '';
+          if (contentType.includes('text/html')) {
+            throw new Error(`Pollinations.ai returned an HTML page instead of an image.`);
+          }
+          if (!contentType.startsWith('image/')) {
+            throw new Error(`Pollinations.ai returned non-image content-type: "${contentType}".`);
+          }
 
-        // Validate the image bytes are parseable and have real dimensions
-        const metadata = await sharp(buffer, { failOn: 'error' }).metadata();
-        if (!metadata.width || !metadata.height || metadata.width < 100 || metadata.height < 100) {
-          throw new Error(`Image validation failed: got ${metadata.width}x${metadata.height} — too small or invalid.`);
-        }
+          buffer = Buffer.from(response.data);
+          if (buffer.length < 5000) {
+            throw new Error(`Image size too small (${buffer.length} bytes), likely a failure or placeholder.`);
+          }
 
-        break; // success
-      } catch (err) {
-        lastError = err;
-        if (attempt < 3) {
-          await new Promise(r => setTimeout(r, 2000 * attempt));
+          const metadata = await sharp(buffer, { failOn: 'error' }).metadata();
+          if (!metadata.width || !metadata.height || metadata.width < 512 || metadata.height < 512) {
+            throw new Error(`Image validation failed: got ${metadata.width}x${metadata.height} — too small or invalid.`);
+          }
+
+          break; // success
+        } catch (err) {
+          lastError = err;
+          if (attempt < 15) {
+            await new Promise(r => setTimeout(r, 20000));
+          }
         }
       }
+      
+      // Additional delay before releasing lock to ensure Pollinations has time to reset rate limit (approx 35s required)
+      await new Promise(r => setTimeout(r, 35000));
+      
+    } finally {
+      // Release lock for next generation request
+      unlockFn();
     }
-    if (!buffer) throw new Error(`Pollinations.ai image generation failed after 3 attempts: ${lastError?.message}`);
+
+    if (!buffer) throw new Error(`Pollinations.ai image generation failed after 15 attempts: ${lastError?.message}`);
     
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     

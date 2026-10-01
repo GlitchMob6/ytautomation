@@ -16,13 +16,20 @@ class AIVideoGenerator {
     this.lastVideoResult = null;
     this.lastNarrationResult = null;
     
-    const { createProviderRouter } = require('./providers/index');
-    this.router = createProviderRouter(resolvedCredentials, this.logger);
-
     // Keep legacy mediaGeneration for video clip assembly
     this.mediaGeneration = options.mediaGeneration || (this.db
       ? new MediaGenerationService(this.db, resolvedCredentials, { logger: this.logger })
       : null);
+  }
+
+  async initialize(credentials) {
+    const resolvedCredentials = credentials?.credentials || credentials || {};
+    const { createProviderRouter } = require('./providers/index');
+    this.router = await createProviderRouter(resolvedCredentials, this.logger, this.db);
+    
+    if (this.mediaGeneration && typeof this.mediaGeneration.initialize === 'function') {
+      await this.mediaGeneration.initialize(resolvedCredentials);
+    }
   }
 
   async generateTTSAudio(text, outputPath) {

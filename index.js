@@ -94,7 +94,8 @@ class ContentGeneratorAgent {
         { logger: this.logger }
       );
       
-      this.aiTextService = new AITextService(this.credentials?.credentials || {});
+      this.aiTextService = new AITextService(this.credentials?.credentials || {}, { db: this.db });
+      await this.aiTextService.initialize(this.credentials?.credentials || {});
 
       // Show which pipeline stages will run for real vs. be simulated
       const capabilities = await this.logCapabilitySummary();
@@ -143,42 +144,33 @@ class ContentGeneratorAgent {
 
   async logCapabilitySummary() {
     const { checkFFmpeg, ffmpegInstallHint } = require('./utils/ffmpeg');
-    const creds = this.credentials.credentials || {};
-
-    const hasText = this.credentials.hasAITextProvider();
-    const hasGemini = Boolean(creds.gemini?.apiKey || process.env.GEMINI_API_KEY);
-    const hasImages = Boolean(creds.openai?.apiKey || process.env.OPENAI_API_KEY || hasGemini);
-    const hasTTS = Boolean(
-      creds.openai?.apiKey || process.env.OPENAI_API_KEY ||
-      creds.elevenLabs?.apiKey || process.env.ELEVENLABS_API_KEY ||
-      creds.azureSpeech?.subscriptionKey || process.env.AZURE_SPEECH_KEY ||
-      hasGemini
-    );
+    const readiness = this.aiTextService.router.readiness.getSummary();
     const hasFFmpeg = await checkFFmpeg();
-    const hasUpload = Boolean(creds.youtube && this.credentials.tokens?.youtube);
-
-    const capabilities = [
-      { name: 'Script & strategy generation', ok: hasText, hint: 'configure an AI provider (npm run credentials:setup)' },
-      { name: 'Image generation (visuals/thumbnails)', ok: hasImages, hint: 'requires an OpenAI or Gemini API key — otherwise gradient slides are used' },
-      { name: 'Voice narration (TTS)', ok: hasTTS, hint: 'configure OpenAI, Gemini, ElevenLabs, or Azure Speech — otherwise videos are silent' },
-      { name: 'Video assembly (FFmpeg)', ok: hasFFmpeg, hint: ffmpegInstallHint() }
-      // YouTube upload check removed — content-only mode
-    ];
+    const hasUpload = Boolean(this.credentials?.credentials?.youtube && this.credentials?.tokens?.youtube);
 
     console.log(chalk.cyan('\n🔎 Capability check:'));
-    for (const cap of capabilities) {
-      if (cap.ok) {
-        console.log(chalk.green(`  ✓ ${cap.name}`));
-      } else {
-        console.log(chalk.yellow(`  ✗ ${cap.name} — ${cap.hint}`));
-      }
-    }
+    const printCap = (name, usable, hint) => {
+      if (usable) console.log(chalk.green(`  ✓ ${name}`));
+      else console.log(chalk.yellow(`  ✗ ${name} — ${hint}`));
+    };
+
+    printCap('Script & strategy generation', readiness.LLM === 'usable', 'configure an AI provider');
+    printCap('Image generation (visuals/thumbnails)', readiness.IMAGE === 'usable', 'configure Pollinations, Gemini, or OpenAI');
+    printCap('Voice narration (TTS)', readiness.TTS === 'usable', 'configure FreeTTS, Gemini, or OpenAI');
+    printCap('Video assembly (FFmpeg)', readiness.RENDERING === 'usable' || hasFFmpeg, ffmpegInstallHint());
+    printCap('Transcription', readiness.TRANSCRIPTION === 'usable', 'configure OpenAI Whisper');
 
     if (!hasFFmpeg) {
       this.logger.warn('FFmpeg is missing: no .mp4 files can be produced until it is installed.');
     }
     console.log('');
-    return { hasText, hasImages, hasTTS, hasFFmpeg, hasUpload };
+    return {
+      hasText: readiness.LLM === 'usable',
+      hasImages: readiness.IMAGE === 'usable',
+      hasTTS: readiness.TTS === 'usable',
+      hasFFmpeg,
+      hasUpload
+    };
   }
 
   requireAPIKey() {
@@ -1925,6 +1917,13 @@ class ContentGeneratorAgent {
     }
     
     const PORT = process.env.PORT || 3456;
+    try {
+      const killPort = require('kill-port');
+      await killPort(PORT, 'tcp');
+    } catch (e) {
+      // Ignore errors if port is not in use or access denied
+    }
+
     this.app.listen(PORT, () => {
       console.log(chalk.green(`\n✅ Spud Wrench running on port ${PORT}`));
       console.log(chalk.gray('─'.repeat(50)));
@@ -1950,4 +1949,6 @@ if (require.main === module) {
   });
 }
 
-module.exports = { ContentGeneratorAgent };
+// Keep the historical constructor name available for integrations and tests
+// while retaining the current ContentGeneratorAgent export.
+module.exports = { ContentGeneratorAgent, YouTubeAutomationAgent: ContentGeneratorAgent };

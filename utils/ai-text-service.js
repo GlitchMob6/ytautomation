@@ -17,17 +17,49 @@ const PROVIDERS = {
 };
 
 class AITextService {
-  constructor(credentials = {}) {
+  constructor(credentials = {}, options = {}) {
     this.logger = new Logger('AITextService');
-    this.router = createProviderRouter(credentials, this.logger);
+    this.db = options.db || null;
+    // Router initialized async via initialize()
+  }
+
+  async initialize(credentials = {}) {
+    this.router = await createProviderRouter(credentials, this.logger, this.db);
+
+    // Compatibility surface for callers that historically inspected the
+    // OpenAI client directly (the router remains the source of truth).
+    const configuredProvider = credentials?.aiProvider?.provider;
+    const configured = configuredProvider
+      ? this.router.providers.llm.find(provider => provider.id === configuredProvider)
+      : this.router.providers.llm.find(provider => provider.id !== 'qwen-local');
+    if (configured) {
+      this.client = configured.client;
+      this.model = configured.model;
+      this.providerName = configured.name;
+    }
   }
 
   async generateText(prompt, options = {}) {
-    const provider = await this.router.getBestProvider('llm');
+    // Support lightweight Gemini fixtures and older integrations that create a
+    // service prototype with a `gemini` client instead of the provider router.
+    if (this.gemini?.models?.generateContent && !this.router) {
+      const config = { maxOutputTokens: options.maxTokens || 2048 };
+      if (!/^gemini-3\.(?:[5-9]|\d{2,})-/.test(this.model || '')) {
+        if (options.temperature !== undefined) config.temperature = options.temperature;
+      }
+      const response = await this.gemini.models.generateContent({ model: this.model, contents: prompt, config });
+      const text = response?.text;
+      if (typeof text !== 'string' || !text.trim()) throw new Error('Gemini returned an empty response.');
+      return text;
+    }
+    const { result, provider } = await this.router.executeWithFailover('llm', 'generate', { prompt, ...options });
     this.providerId = provider.id;
     this.providerName = provider.name;
     this.providerModel = provider.model;
-    return await provider.generate({ prompt, ...options });
+    this.client = provider.client;
+    this.model = provider.model;
+    if (typeof result !== 'string' || !result.trim()) throw new Error('AI text provider returned an empty response.');
+    return result;
   }
 
 }

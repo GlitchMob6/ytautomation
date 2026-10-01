@@ -1,4 +1,4 @@
-caonst ui = {
+const ui = {
   state: null,
   currentView: 'overview',
   refreshing: false,
@@ -169,10 +169,75 @@ function renderDashboard() {
   renderReadiness(state.readiness);
   renderOperator(state.channelStrategy, state.operatorRuns || [], { ...state.system, readiness: state.readiness });
   populateSettings(state.profile, state.settings, state.system.videoProviders || []);
+  renderCreatorStudio(state);
 
   if ($('.nav-item.active')?.dataset.view === 'remix') {
     fetchRemixJobs();
   }
+}
+
+/*
+ * Creator-studio views intentionally read the existing dashboard contract.  They
+ * are a faster, stage-oriented way into the same jobs and productions; they do
+ * not manufacture assets or claim that simulated output is real.
+ */
+function renderCreatorStudio(state = {}) {
+  const jobs = Array.isArray(state.jobs) ? state.jobs : [];
+  const pipeline = Array.isArray(state.pipeline) ? state.pipeline : [];
+  const providers = Array.isArray(state.system?.videoProviders) ? state.system.videoProviders : [];
+  const activeJobs = jobs.filter(job => ['queued', 'running', 'failed', 'interrupted'].includes(job.status));
+  const models = providers.length ? providers : [{ id: 'slideshow', name: 'Local slideshow', available: true, model: 'FFmpeg' }];
+  const stageFor = job => {
+    const raw = job?.stage || (job?.status === 'completed' ? 'quality_review' : 'waiting');
+    const rawLower = raw.toLowerCase();
+    if (rawLower.includes('idea') || rawLower.includes('research') || rawLower.includes('plan')) return 'Planning';
+    if (rawLower.includes('script') || rawLower.includes('writ')) return 'Writing';
+    if (rawLower.includes('image') || rawLower.includes('visual') || rawLower.includes('asset')) return 'Visuals';
+    if (rawLower.includes('voice') || rawLower.includes('tts') || rawLower.includes('audio')) return 'Voice';
+    if (rawLower.includes('video') || rawLower.includes('assembl') || rawLower.includes('render') || rawLower.includes('ffmpeg')) return 'Assembly';
+    if (rawLower.includes('review')) return 'Review';
+    return label(raw);
+  };
+  const reality = item => {
+    const finalVideo = item?.assets?.finalVideo || item?.assetUrls?.video || item?.finalVideo;
+    if (finalVideo?.simulated === true || item?.simulated === true) return 'Simulated';
+    if (finalVideo?.path || finalVideo?.url || typeof finalVideo === 'string') return 'Real media';
+    return 'No media yet';
+  };
+  const projectRows = pipeline.slice(0, 8).map(item => `
+    <article class="studio-row" data-open-content="${escapeHTML(item.id)}">
+      <div class="studio-row-main"><strong>${escapeHTML(item.title || item.topic || 'Untitled project')}</strong><span>${escapeHTML(item.topic || 'No topic recorded')}</span></div>
+      <span>${statusChip(item.review_status || item.status || item.schedule_status)}</span>
+      <span class="studio-row-meta">${escapeHTML(reality(item))}</span>
+      <button class="button secondary small" type="button">Open →</button>
+    </article>`).join('');
+  const assetRows = pipeline.flatMap(item => {
+    const assets = item.assets || {};
+    return Object.entries(assets).filter(([, asset]) => asset && (asset.path || asset.url || asset.simulated !== undefined)).map(([kind, asset]) => `
+      <article class="asset-card"><div class="asset-placeholder">${escapeHTML(kind.slice(0, 1).toUpperCase())}</div><div><strong>${escapeHTML(item.title || item.topic || 'Untitled')}</strong><span>${escapeHTML(label(kind))}</span><small>${asset.simulated ? 'Simulated output' : asset.path || asset.url ? 'Real file recorded' : 'Status only'}</small></div></article>`);
+  }).join('');
+  const reviewRows = pipeline.filter(item => ['needs_review', 'needs_attention'].includes(item.review_status)).slice(0, 8).map(item => `
+    <article class="studio-review-row" data-open-content="${escapeHTML(item.id)}"><div><strong>${escapeHTML(item.title || item.topic || 'Untitled')}</strong><span>${escapeHTML(label(item.review_status))} · Quality ${qualityScore(item.qualityChecks)}%</span></div><button class="button secondary small" type="button">Review →</button></article>`).join('');
+  const exportRows = pipeline.filter(item => ['approved', 'scheduled', 'published'].includes(item.review_status) || ['approved', 'scheduled', 'published'].includes(item.schedule_status)).slice(0, 8).map(item => `
+    <article class="studio-row"><div class="studio-row-main"><strong>${escapeHTML(item.title || item.topic || 'Untitled')}</strong><span>${escapeHTML(label(item.schedule_status || item.review_status || item.status))}</span></div><span class="studio-row-meta">${escapeHTML(reality(item))}</span><button class="button secondary small" type="button" data-open-content="${escapeHTML(item.id)}">Inspect →</button></article>`).join('');
+  const modelRows = models.map(model => `<article class="model-card"><div><strong>${escapeHTML(model.name || label(model.id))}</strong><span>${escapeHTML(model.model || 'Configured capability')}</span></div>${statusChip(model.available ? 'available' : 'unavailable')}<small>${model.available ? 'Available for new work' : 'Not configured; no calls will be made'}</small></article>`).join('');
+  const stageRows = activeJobs.length ? activeJobs.slice(0, 6).map(job => `<article class="stage-card"><div class="stage-card-heading"><strong>${escapeHTML(job.title || job.topic || 'Generation job')}</strong>${statusChip(job.status)}</div><div class="stage-track"><i style="width:${Math.max(0, Math.min(100, Number(job.progress) || 0))}%"></i></div><div><span>${escapeHTML(stageFor(job))}</span><small>${Number(job.progress) || 0}% · ${escapeHTML(job.provider || 'Provider routing recorded at runtime')}</small></div></article>`).join('') : empty('No active stages. Start a project to see its live checkpoints here.');
+  const setHTML = (selector, html, fallback) => { const node = $(selector); if (node) node.innerHTML = html || empty(fallback); };
+  setHTML('#projects-list', projectRows, 'No projects yet. Create a project to start the pipeline.');
+  setHTML('#asset-library-list', assetRows, 'Recorded assets appear here after a production creates them.');
+  setHTML('#review-queue-list', reviewRows, 'Nothing is waiting for review.');
+  setHTML('#export-list', exportRows, 'Approved or scheduled productions will appear here.');
+  setHTML('#model-lab-list', modelRows, 'No model capabilities are registered.');
+  setHTML('#pipeline-stage-list', stageRows, 'No active stages.');
+  const count = $('#studio-project-count'); if (count) count.textContent = String(pipeline.length);
+  const active = $('#studio-active-count'); if (active) active.textContent = String(activeJobs.length);
+  const simulated = $('#studio-simulated-count'); if (simulated) simulated.textContent = String(pipeline.filter(item => reality(item) === 'Simulated').length);
+  const dnaVoice = $('#dna-voice');
+  if (dnaVoice) dnaVoice.textContent = state.profile?.brand_voice || state.profile?.default_style || 'Not configured';
+  const dnaSummary = $('#dna-summary');
+  if (dnaSummary) dnaSummary.textContent = state.profile?.target_audience
+    ? `${state.profile.target_audience}${state.profile.visual_style ? ` · ${state.profile.visual_style}` : ''}`
+    : 'Save channel settings to make this brief visible to every creator and agent.';
 }
 
 function renderReadiness(readiness = {}) {
@@ -809,21 +874,33 @@ function populateSettings(profile = {}, settings = {}, providers = []) {
 }
 
 function switchView(view) {
+  const aliases = { home: 'overview', repurpose: 'remix' };
+  const canonical = aliases[view] || view;
   ui.currentView = view;
-  $$('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.view === view));
-  $$('.view').forEach(item => item.classList.toggle('active', item.id === `${view}-view`));
+  $$('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.view === view || item.dataset.view === canonical));
+  $$('.view').forEach(item => item.classList.toggle('active', item.id === `${canonical}-view`));
   const titles = {
+    home: ['HOME', 'Know what happens next.'],
+    create: ['CREATE', 'Turn an idea into a real production.'],
+    projects: ['PROJECTS', 'Keep every production moving.'],
     overview: ['OPERATOR OVERVIEW', 'Know what happens next.'],
     operator: ['AUTONOMOUS OPERATOR', 'Give Lumen the strategy.'],
     pipeline: ['CONTENT OPERATIONS', 'From idea to published.'],
+    'asset-library': ['ASSET LIBRARY', 'Every recorded asset, with provenance.'],
+    repurpose: ['REPURPOSE', 'Make more from approved source media.'],
+    dna: ['CHANNEL DNA', 'Keep the creative system consistent.'],
+    review: ['REVIEW', 'Make the human decision before export.'],
+    export: ['EXPORT', 'Package approved work without inventing media.'],
+    'model-lab': ['MODEL LAB', 'See which capabilities are real and ready.'],
     calendar: ['EDITORIAL PLANNING', 'Plan before you generate.'],
     analytics: ['PERFORMANCE', 'Turn results into the next move.'],
     engagement: ['AUDIENCE ENGAGEMENT', 'Talk with the people watching.'],
     readiness: ['PRODUCTION READINESS', 'Verify before autonomy runs.'],
     settings: ['CHANNEL GUARDRAILS', 'Make every agent sound like you.']
   };
-  $('#view-eyebrow').textContent = titles[view][0];
-  $('#view-title').textContent = titles[view][1];
+  const title = titles[view] || titles[canonical] || titles.overview;
+  $('#view-eyebrow').textContent = title[0];
+  $('#view-title').textContent = title[1];
   location.hash = view;
 }
 
@@ -1775,8 +1852,18 @@ $('#api-key-button').addEventListener('click', () => {
   if (requestApiKey() !== null) showToast('Dashboard API key saved in this browser.');
 });
 
+$('#studio-create-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.currentTarget));
+  try {
+    await mutate('/generate', 'POST', { ...values, topic: values.topic.trim() || null }, 'Project created; generation started.');
+    event.currentTarget.reset();
+    switchView('projects');
+  } catch (_error) { /* toast already shown */ }
+});
+
 const initialView = location.hash.slice(1);
-if (['overview', 'operator', 'pipeline', 'calendar', 'analytics', 'engagement', 'readiness', 'settings', 'remix'].includes(initialView)) switchView(initialView);
+if (['home', 'overview', 'create', 'projects', 'pipeline', 'asset-library', 'repurpose', 'dna', 'review', 'export', 'model-lab', 'operator', 'calendar', 'analytics', 'engagement', 'readiness', 'settings', 'remix'].includes(initialView)) switchView(initialView);
 refreshDashboard();
 setInterval(() => refreshDashboard(true), 8000);
 

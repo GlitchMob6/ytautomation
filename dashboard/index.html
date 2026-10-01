@@ -21,17 +21,26 @@
         <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
         <span><strong id="brand-name">Content Studio</strong><small>Content generator</small></span>
       </a>
-      <p class="sidebar-label" aria-hidden="true">Workspace</p>
-      <nav aria-label="Main navigation">
-        <button class="nav-item active" data-view="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="9.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.5"/><rect x="13.5" y="11.5" width="7.5" height="9.5" rx="1.5"/><rect x="3" y="15.5" width="7.5" height="5.5" rx="1.5"/></svg> Overview</button>
-        <button class="nav-item" data-view="operator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg> Autonomous operator</button>
-        <button class="nav-item" data-view="pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7"/><circle cx="17.5" cy="6" r="2"/><circle cx="14.5" cy="18" r="2"/></svg> Pipeline <b id="review-badge" class="badge hidden">0</b></button>
-        <button class="nav-item" data-view="calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 13.5h3v3h-3z"/></svg> Calendar & ideas</button>
+       <p class="sidebar-label" aria-hidden="true">Workspace</p>
+       <nav aria-label="Main navigation">
+         <button class="nav-item active" data-view="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="9.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.5"/><rect x="13.5" y="11.5" width="7.5" height="9.5" rx="1.5"/><rect x="3" y="15.5" width="7.5" height="5.5" rx="1.5"/></svg> Home</button>
+         <button class="nav-item" data-view="create"><span class="nav-glyph">＋</span> Create</button>
+         <button class="nav-item" data-view="projects"><span class="nav-glyph">▦</span> Projects</button>
+         <button class="nav-item" data-view="pipeline"><span class="nav-glyph">⇢</span> Pipeline <b id="review-badge" class="badge hidden">0</b></button>
+         <button class="nav-item" data-view="asset-library"><span class="nav-glyph">▤</span> Asset Library</button>
+         <button class="nav-item" data-view="repurpose"><span class="nav-glyph">↗</span> Repurpose</button>
+         <button class="nav-item" data-view="dna"><span class="nav-glyph">◈</span> DNA</button>
+         <button class="nav-item" data-view="review"><span class="nav-glyph">✓</span> Review</button>
+         <button class="nav-item" data-view="export"><span class="nav-glyph">⇩</span> Export</button>
+         <button class="nav-item" data-view="model-lab"><span class="nav-glyph">◎</span> Model Lab</button>
+         <p class="sidebar-label nav-section-label" aria-hidden="true">Operations</p>
+         <button class="nav-item" data-view="operator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg> Autonomous operator</button>
+         <button class="nav-item" data-view="calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 13.5h3v3h-3z"/></svg> Calendar & ideas</button>
         <button class="nav-item" data-view="analytics" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 20.5h17"/><path d="M6.5 20V11M11 20V4.5M15.5 20v-7M20 20V8.5"/></svg> Analytics</button>
         <button class="nav-item" data-view="engagement" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 01-9.1 8.4 9 9 0 01-3.8-.9L3 20l1-4.9A8.4 8.4 0 1121 11.5z"/><path d="M8 10h8M8 13.5h5"/></svg> Engagement</button>
         <button class="nav-item" data-view="readiness"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.8l7.5 3v6c0 4.8-3.2 8.2-7.5 9.4-4.3-1.2-7.5-4.6-7.5-9.4v-6z"/><path d="M8.8 12.2l2.3 2.3 4.4-4.6"/></svg> Production readiness</button>
-        <button class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.87.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.33-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.51 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.28.66.9 1.05 1.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.51 1z"/></svg> Channel setup</button>
-        <button class="nav-item" data-view="remix" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 6.5 7 1-5 4.9 1.2 7-6.2-3.3-6.2 3.3L7 14.4 2 9.5l7-1L12 2z"/></svg> Remix Studio</button>
+         <button class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.87.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.33-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.51 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.28.66.9 1.05 1.55 1H21a2 2 0 110 4h-.09a2 2 0 00-1.51 1z"/></svg> Settings</button>
+         <button class="nav-item" data-view="remix" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 6.5 7 1-5 4.9 1.2 7-6.2-3.3-6.2 3.3L7 14.4 2 9.5l7-1L12 2z"/></svg> Remix Studio</button>
       </nav>
       <div class="sidebar-footer">
         <div class="system-pill"><i id="system-dot"></i><span id="system-label">Connecting…</span></div>
@@ -86,13 +95,64 @@
         </div>
       </section>
 
+      <section id="create-view" class="view">
+        <div class="section-intro"><div><p class="eyebrow">NEW PROJECT</p><h2>Create a production</h2><p>Start with a brief. Spud Wrench will show every checkpoint and keep simulated output clearly labeled.</p></div><span class="status">Draft first</span></div>
+        <div class="create-studio-grid">
+          <form id="studio-create-form" class="panel create-form">
+            <div class="panel-heading"><div><p class="eyebrow">CREATOR BRIEF</p><h2>What are you making?</h2></div></div>
+            <label><span>Topic or working title</span><input name="topic" maxlength="200" required placeholder="A practical guide to automating weekly reports"></label>
+            <div class="form-grid two"><label><span>Format</span><select name="style"><option value="explainer">Explainer</option><option value="tutorial">Tutorial</option><option value="list">List</option><option value="review">Review</option><option value="story">Story</option></select></label><label><span>Length</span><select name="length"><option value="short">Short · 2–4 min</option><option value="medium" selected>Medium · 8–12 min</option><option value="long">Long · 15–20 min</option></select></label></div>
+            <label><span>Creative direction <small>optional</small></span><textarea name="direction" rows="4" maxlength="1000" placeholder="Audience, point of view, examples, or constraints"></textarea></label>
+            <p class="callout">This queues a real generation job. The dashboard never presents a placeholder as a completed video.</p>
+            <div class="form-actions"><button type="submit" class="button primary">Start project</button><button type="button" class="button secondary" data-go="projects">View projects</button></div>
+          </form>
+          <article class="panel create-side"><div class="panel-heading"><div><p class="eyebrow">WHAT HAPPENS NEXT</p><h2>Visible checkpoints</h2></div></div><div class="studio-stage-list"><div><strong>01 · Strategy</strong><span>Topic and angle</span></div><div><strong>02 · Script</strong><span>Draft and narration</span></div><div><strong>03 · Visuals</strong><span>Asset provenance</span></div><div><strong>04 · Review</strong><span>Human approval gate</span></div><div><strong>05 · Export</strong><span>Only recorded media</span></div></div></article>
+        </div>
+      </section>
+
+      <section id="projects-view" class="view">
+        <div class="section-intro"><div><p class="eyebrow">PROJECTS</p><h2>Your productions</h2><p>Open a project to inspect its current stage, status, quality checks, and media evidence.</p></div><div class="studio-metrics"><span><b id="studio-project-count">0</b> projects</span><span><b id="studio-active-count">0</b> active</span></div></div>
+        <div id="projects-list" class="studio-list"></div>
+      </section>
+
+      <section id="asset-library-view" class="view">
+        <div class="section-intro"><div><p class="eyebrow">ASSET LIBRARY</p><h2>Recorded media</h2><p>Assets are shown only when the backend records a file or an explicit simulated state.</p></div><span class="status">Provenance visible</span></div>
+        <div id="asset-library-list" class="asset-grid"></div>
+      </section>
+
+      <section id="dna-view" class="view">
+        <div class="section-intro"><div><p class="eyebrow">CHANNEL DNA</p><h2>Creative system</h2><p>Voice, audience, visual direction, and guardrails that shape every project.</p></div><button class="button secondary" data-go="settings">Edit settings →</button></div>
+        <div class="dna-grid"><article class="panel"><p class="eyebrow">STYLE GUIDE</p><h2 id="dna-voice">Not configured</h2><p id="dna-summary" class="meta-line">Save channel settings to make this brief visible to every creator and agent.</p></article><article class="panel"><p class="eyebrow">SAFETY &amp; RIGHTS</p><h2>Human gate stays on</h2><p class="meta-line">Evidence, media rights, and approval remain explicit before scheduling or publishing.</p></article></div>
+      </section>
+
+      <section id="review-view" class="view">
+        <div class="section-intro"><div><p class="eyebrow">REVIEW DESK</p><h2>Decisions waiting for you</h2><p>Inspect real status and quality evidence before a project moves to export.</p></div><button class="button secondary" data-go="pipeline">Open full pipeline →</button></div>
+        <div id="review-queue-list" class="studio-list"></div>
+      </section>
+
+      <section id="export-view" class="view">
+        <div class="section-intro"><div><p class="eyebrow">EXPORT</p><h2>Approved work</h2><p>Exports reflect backend state. No media is generated by this screen.</p></div><span class="status">No fabricated files</span></div>
+        <div id="export-list" class="studio-list"></div>
+      </section>
+
+      <section id="model-lab-view" class="view">
+        <div class="section-intro"><div><p class="eyebrow">MODEL LAB</p><h2>Capabilities and routing</h2><p>Know which model is configured, available, or unavailable before starting a project.</p></div></div>
+        <div id="model-lab-list" class="model-grid"></div>
+        <article class="panel pipeline-stage-panel"><div class="panel-heading"><div><p class="eyebrow">LIVE STAGES</p><h2>Current model work</h2></div></div><div id="pipeline-stage-list" class="stage-grid"></div></article>
+      </section>
+
       <section id="operator-view" class="view">
         <div class="section-intro"><div><h2>Autonomous Channel Operator</h2><p>Set the destination once. Spud Wrench researches, plans, produces, and manages the channel workflow around it.</p></div><span id="operator-strategy-status" class="status">Not configured</span></div>
         <div class="operator-grid">
           <form id="strategy-form" class="panel settings-form">
-            <div class="panel-heading"><div><p class="eyebrow">CHANNEL MANDATE</p><h2>What should this channel achieve?</h2></div></div>
+            <div class="panel-heading"><div><p class="eyebrow">CREATOR LAUNCH</p><h2>What do you want to create?</h2></div></div>
             <div class="form-grid">
-              <label class="full-row"><span>Objective</span><textarea name="objective" rows="3" maxlength="1000" placeholder="Become the most trusted practical channel for small businesses adopting AI." required></textarea></label>
+              <label class="full-row"><textarea name="objective" rows="3" maxlength="1000" placeholder="e.g. A 5-minute explainer video about how black holes form." required style="font-size: 1.1rem; padding: 16px;"></textarea></label>
+            </div>
+            
+            <details style="margin-top: 20px; margin-bottom: 20px;">
+              <summary style="cursor: pointer; color: var(--text-dim); font-size: 0.9rem; font-weight: 500;">Advanced channel settings</summary>
+              <div class="form-grid" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
               <label class="full-row"><span>Audience</span><textarea name="audience" rows="2" maxlength="500" placeholder="Owners and operators at 5–50 person service businesses" required></textarea></label>
               <label class="full-row"><span>Value proposition</span><textarea name="valueProposition" rows="2" maxlength="1000" placeholder="Clear, tested advice viewers can apply this week"></textarea></label>
               <label class="full-row"><span>Content pillars</span><input name="contentPillars" placeholder="AI workflows, automation playbooks, tool reviews" required><small>Separate 1–8 durable themes with commas.</small></label>
@@ -107,8 +167,10 @@
               <label class="full-row"><span>Outcome context</span><input name="successMetric" maxlength="300" placeholder="Grow qualified subscribers who return for practical automation tutorials"><small>Used by planning alongside the measurable primary outcome.</small></label>
               <label class="full-row"><span>Boundaries and constraints</span><textarea name="constraints" rows="3" maxlength="2000" placeholder="No hype, no unverified statistics, explain costs and tradeoffs."></textarea></label>
             </div>
+
+            </details>
             <p class="callout">The operator uses YouTube trend signals, configured competitors, and channel history. Publishing still obeys your quality, factual-review, rights, and approval gates.</p>
-            <div class="form-actions"><button type="submit" class="button secondary">Save strategy</button><button id="activate-operator-button" type="button" class="button primary">Activate & run now</button><button id="pause-operator-button" type="button" class="button danger hidden">Pause operator</button></div>
+            <div class="form-actions"><button id="activate-operator-button" type="button" class="button primary" style="width: 100%; font-size: 1.1rem; padding: 14px;">CREATE</button><button type="submit" class="button secondary hidden">Save strategy</button><button id="pause-operator-button" type="button" class="button danger hidden">Pause operator</button></div>
           </form>
           <div class="operator-side">
             <article class="panel">
